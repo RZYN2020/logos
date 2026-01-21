@@ -1,0 +1,202 @@
+version: '3.8'
+
+services:
+  # Etcd 配置中心
+  etcd-0:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: etcd-0
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ETCD_NAME=etcd-0
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd-0:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd-0:2379
+      - ETCD_INITIAL_CLUSTER=etcd-0=http://etcd-0:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
+    volumes:
+      - etcd0-data:/etcd-data
+    networks:
+      - logging
+
+  # ZooKeeper for Kafka
+  zookeeper-0:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper-0
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - logging
+
+  # Kafka 消息队列
+  kafka-0:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka-0
+    depends_on:
+      - zookeeper-0
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-0:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-0:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka0-data:/var/lib/kafka/data
+    networks:
+      - logging
+
+  # Elasticsearch
+  elasticsearch-0:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
+    container_name: elasticsearch-0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+    volumes:
+      - es0-data:/usr/share/elasticsearch/data
+    networks:
+      - logging
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.14
+    container_name: kibana
+    depends_on:
+      - elasticsearch-0
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-0:9200
+    networks:
+      - logging
+
+  # Flink JobManager
+  flink-jobmanager:
+    image: flink:1.17.1-scala_2.12-java8
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    depends_on:
+      - kafka-0
+    networks:
+      - logging
+
+  # Flink TaskManager
+  flink-taskmanager:
+    image: flink:1.17.1-scala_2.12-java8
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    networks:
+      - logging
+
+  # PostgreSQL
+  postgres:
+    image: postgres:14-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: logdb
+      POSTGRES_USER: loguser
+      POSTGRES_PASSWORD: logpass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - logging
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - logging
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - logging
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - logging
+
+  # Jaeger
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - logging
+
+networks:
+  logging:
+    driver: bridge
+
+volumes:
+  etcd0-data:
+  kafka0-data:
+  es0-data:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

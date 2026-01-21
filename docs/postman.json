@@ -1,0 +1,76 @@
+{
+  "name": "Log System Config Server",
+  "version": "1.0.0",
+  "description": "策略配置 API",
+  "url": "http://localhost:8080",
+  "apis": [
+    {
+      "name": "策略管理",
+      "base_url": "/api/v1/strategies",
+      "description": "增删改查策略",
+      "endpoints": [
+        {
+          "name": "获取所有策略",
+          "method": "GET",
+          "summary": "返回策略列表"
+        },
+        {
+          "name": "创建策略",
+          "method": "POST",
+          "summary": "创建新的日志策略",
+          "request_body": {
+            "mode": "raw",
+            "raw": "{\"name\":\"test\",\"rules\":[]}"
+          }
+        },
+        {
+          "name": "获取策略详情",
+          "method": "GET",
+          "summary": "根据ID获取策略",
+          "path": "/{id}"
+        },
+        {
+          "name": "更新策略",
+          "method": "PUT",
+          "summary": "更新指定策略",
+          "path": "/{id}",
+          "request_body": {
+            "mode": "raw",
+            "raw": "{\"name\":\"test\",\"rules\":[]}"
+          }
+        },
+        {
+          "name": "删除策略",
+          "method": "DELETE",
+          "summary": "删除指定策略",
+          "path": "/{id}"
+        },
+        {
+          "name": "获取策略历史",
+          "method": "GET",
+          "summary": "查看策略版本历史",
+          "path": "/{id}/history"
+        }
+      ]
+    },
+    {
+      "name": "系统信息",
+      "base_url": "/api/v1",
+      "description": "系统状态和健康检查",
+      "endpoints": [
+        {
+          "name": "系统信息",
+          "method": "GET",
+          "path": "/info",
+          "summary": "获取系统版本和运行状态"
+        },
+        {
+          "name": "健康检查",
+          "method": "GET",
+          "path": "/health",
+          "summary": "检查系统健康状态"
+        }
+      ]
+    }
+  ]
+}
