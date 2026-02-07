@@ -207,21 +207,17 @@
 ## 逻辑视图
 
 ```
-┌─────────────────────┐
-│       SDK 层        │
-├─────────────────────┤
-│ Guard 拦截器      │
-│ Logger API         │
-│ 策略引擎          │
-│ 语义化构建器       │
-└─────────────────────┘
-         ↓
-┌─────────────────────┐
-│     基础设施       │
-├─────────────────────┤
-│ Etcd 配置中心     │
-│ Kafka 消息队列     │
-└─────────────────────┘
+应用层 → Log SDK (logger/guard/strategy/async/encoder)
+                    ↓
+配置层 → Etcd + Config Server + Frontend
+                    ↓
+缓冲层 → Kafka
+                    ↓
+处理层 → Log Processor (parser/semantic/enricher/sink)
+                    ↓
+存储层 → ES + PG + Redis
+                    ↓
+分析层 → Log Analyzer (SQL/Reporter)
 ```
 
 ---
@@ -229,22 +225,23 @@
 ## 进程视图
 
 ```
-┌─────────────────────┐
-│     应用进程空间     │
-├─────────────────────┤
-│ 应用线程            │
-│ 拦截器线程          │
-│ 策略监听线程        │
-│ 日志线程池          │
-│ 环形缓冲区          │
-└─────────────────────┘
+应用进程空间
+├── 业务协程 (手动调用 Logger API)
+├── Guard 中间件协程 (自动记录 HTTP 请求)
+Log SDK 进程
+├── Logger API 协程
+├── Strategy 策略引擎协程
+├── Watcher (Etcd 监听)
+├── Async Producer 协程
+└── Worker Pool + 环形缓冲区
          ↓
-┌─────────────────────┐
-│    异步 I/O 模型    │
-├─────────────────────┤
-│ Kafka 生产者        │
-│ 批量处理器          │
-└─────────────────────┘
+    Kafka
+         ↓
+Log Processor 进程
+├── pkg/parser 协程池
+├── pkg/semantic 协程池
+├── pkg/enricher 协程池
+└── pkg/sink 协程池
 ```
 
 ---
@@ -254,18 +251,28 @@
 ```
 K8s 集群
 ├── apps 命名空间
-│   ├── 应用 Pod 1
-│   ├── 应用 Pod 2
-│   └── 应用 Pod N
+│   ├── 应用 Pod 1 (内嵌 SDK)
+│   ├── 应用 Pod 2 (内嵌 SDK)
+│   └── 应用 Pod N (内嵌 SDK)
 ├── logging 命名空间
 │   ├── Etcd StatefulSet
-│   ├── 配置 API 服务
-│   └── 管理面板服务
+│   ├── Config Server
+│   └── Frontend 管理面板
 ├── streaming 命名空间
 │   ├── Kafka 集群
-│   └── Flink 集群
-└── storage 命名空间
-    └── Elasticsearch 集群
+│   └── ZooKeeper 集群
+├── processor 命名空间
+│   └── Log Processor (pkg/parser/semantic/enricher/sink)
+├── storage 命名空间
+│   ├── Elasticsearch 集群
+│   ├── PostgreSQL
+│   └── Redis
+└── observability 命名空间
+    ├── OpenTelemetry Collector
+    ├── Jaeger
+    ├── Prometheus
+    ├── Grafana
+    └── Kibana
 ```
 
 ---
@@ -397,12 +404,12 @@ log.Info("请求处理",
 
 ---
 
-## 技术四：流处理引擎
+## 技术四：Log Processor 流处理
 
-### Flink 处理管线
+### 轻量化处理管线
 
 ```
-Kafka Source → 模式解析器 → 语义验证器 → 上下文增强器 → 时间窗口 → ES Sink
+Kafka Consumer → pkg/parser → pkg/semantic → pkg/enricher → pkg/sink → Elasticsearch
 ```
 
 ### 处理能力
@@ -410,6 +417,7 @@ Kafka Source → 模式解析器 → 语义验证器 → 上下文增强器 → 
 - ⚡ 实时解析：延迟 < 10ms
 - 📊 模式学习：自动识别新模式
 - 🔍 异常检测：识别罕见模式
+- 💡 轻量化设计：替代 Flink，降低运维复杂度
 
 ---
 

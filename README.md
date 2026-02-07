@@ -17,40 +17,75 @@
 ## 系统架构
 
 ```
-应用服务 → SDK (Guard) → Etcd 配置中心
-                  ↓
-            语义化构建器 → Kafka → Flink → Elasticsearch
-                  ↓            ↓          ↓
-            OpenTelemetry    流处理      存储/分析
+应用层 (内嵌 SDK)
+    ├─ pkg/logger   - Logger API
+    ├─ pkg/guard    - 中间件拦截器
+    ├─ pkg/strategy - 动态策略引擎
+    ├─ pkg/async    - 异步 I/O
+    └─ pkg/encoder  - 编码器
+          ↓
+配置层
+    ├─ Etcd           - 配置中心
+    ├─ Config Server    - 策略管理 API
+    └─ Frontend       - 管理面板
+          ↓
+缓冲层
+    └─ Kafka          - 消息队列
+          ↓
+处理层
+    └─ Log Processor
+        ├─ pkg/parser   - 模式解析
+        ├─ pkg/semantic - 语义增强
+        ├─ pkg/enricher - 上下文富化
+        └─ pkg/sink     - 输出目标
+          ↓
+存储层
+    ├─ Elasticsearch   - 日志存储
+    ├─ PostgreSQL     - 元数据存储
+    └─ Redis         - 缓存
+          ↓
+分析层
+    └─ Log Analyzer
+        ├─ SQL 查询引擎
+        └─ 自动报告生成
 ```
+
+**架构改进**：
+- **SDK 轻量化**：语义处理移到服务端，SDK 只负责收集和发送
+- **模块化设计**：SDK 五大核心模块清晰分离，便于维护
+- **轻量级 Processor**：替代 Flink，降低运维复杂度
+- **背压机制**：缓冲区满时自动丢弃，避免阻塞应用
+- **降级策略**：Kafka 不可用时自动降级到控制台输出
 
 ## 项目结构
 
 ```
-├── log-sdk/              # 日志 SDK (Go)
+├── log-sdk/              # 日志 SDK (Go) - 轻量级客户端
 │   └── log-sdk/
 │       ├── pkg/
 │       │   ├── logger/   # Logger API
-│       │   ├── guard/    # Guard 拦截器
-│       │   ├── strategy/ # 策略引擎
-│       │   ├── semantic/ # 语义化处理
-│       │   ├── async/    # 异步 I/O
-│       │   └── encoder/ # 编码器
-│       └── cmd/         # 命令行工具
-├── log-streaming/        # 流处理 (Go/Scala)
+│       │   ├── guard/    # Guard 拦截器（中间件）
+│       │   ├── strategy/ # 策略引擎（采样、过滤、Etcd Watch）
+│       │   ├── async/    # 异步 I/O（Kafka Producer + 背压）
+│       │   └── encoder/  # 编码器（JSON）
+│       └── cmd/          # 命令行工具
+│           ├── logger/    # Logger 命令
+│           └── config/    # Config 命令
+├── log-processor/        # 日志处理器 (Go) - 服务端语义处理
 │   ├── pkg/
-│   │   ├── parser/   # 模式解析
-│   │   ├── enricher/ # 上下文增强
-│   │   └── sink/     # ES 输出
-│   └── cmd/job/       # Flink Job
+│   │   ├── parser/       # 模式解析（JSON/Regex/Multi）
+│   │   ├── semantic/     # 语义化构建器（HTTP/User/Error/Domain）
+│   │   ├── enricher/     # 上下文增强
+│   │   └── sink/         # 输出目标（ES/Console/Webhook）
+│   └── cmd/job/          # 处理器入口
 ├── log-analyzer/        # 分析服务 (Go)
 │   ├── api/            # SQL 查询 API
 │   ├── storage/        # 数据访问层
 │   └── cmd/server/     # 服务启动
-├── config-server/       # 配置服务 (Go)
+├── config-server/       # 配置服务 (Go) - 策略管理 API
 │   ├── pkg/api/       # API 处理器
 │   └── cmd/main.go   # 服务入口
-├── frontend/           # 前端 (React + Vite)
+├── frontend/           # 前端 (React + Vite) - 管理控制台
 │   ├── src/
 │   │   ├── api/       # API 客户端
 │   │   ├── components/ # React 组件
@@ -66,8 +101,10 @@
 │   └── k8s/            # Kubernetes
 ├── docs/               # 文档
 │   ├── README.md       # 完整文档
-│   ├── postman.json    # Postman 集合文档
-│   └── slides.md       # 答辩幻灯片
+│   ├── thesis.md      # 论文大纲
+│   ├── slides.md      # 答辩幻灯片
+│   ├── roadmap.md     # 项目路线图
+│   └── postman.json    # Postman 集合文档
 ```
 
 ## 快速开始
@@ -101,7 +138,7 @@ docker-compose logs -f
 | Kafka | localhost:9092 |
 | Elasticsearch | http://localhost:9200 |
 | Kibana | http://localhost:5601 |
-| Flink | http://localhost:8081 |
+| Log Processor | http://localhost:9091 |
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 |
 | Jaeger | http://localhost:16686 |
@@ -178,7 +215,7 @@ npm run dev
 
 ## 核心组件
 
-### 1. Logger API
+### 1. pkg/logger (Logger API)
 
 高性能日志接口，支持：
 - 结构化日志字段
@@ -186,39 +223,47 @@ npm run dev
 - 上下文传递
 - 性能优化（零拷贝）
 
-### 2. 策略引擎
+### 2. pkg/guard (Guard 拦截器)
+
+HTTP 中间件自动记录：
+- 请求方法、路径、状态码
+- 响应时间
+- 客户端 IP、User ID
+- TraceID/SpanID 注入
+
+### 3. pkg/strategy (策略引擎)
 
 动态策略配置，支持：
 - 日志级别过滤
 - 路由策略
 - 采样策略
 - 脱敏策略
+- Etcd Watch 热加载
 
-### 3. 语义化构建器
-
-自动提取业务上下文：
-- HTTP 请求信息
-- gRPC 元数据
-- 用户会话信息
-- 自定义字段
-
-### 4. 异步 I/O
+### 4. pkg/async (异步 I/O)
 
 高性能异步发送：
-- 环形缓冲区
+- Kafka Producer 封装
 - Worker Pool
+- 环形缓冲区
 - 批量发送
-- 连接池管理
+- 背压处理
 
-### 5. 流处理引擎
+### 5. pkg/encoder (编码器)
 
-Flink 实时处理：
-- 模式解析
-- 语义验证
-- 上下文增强
-- 异常检测
+日志格式编码：
+- JSON 编码器
+- 可扩展编码器接口
 
-### 6. SQL 查询引擎
+### 6. Log Processor (pkg/parser/semantic/enricher/sink)
+
+轻量化服务端处理：
+- pkg/parser: 模式解析（JSON/Regex）
+- pkg/semantic: 语义增强（HTTP/User/Error/Domain）
+- pkg/enricher: 上下文富化
+- pkg/sink: 输出目标（ES/Console/Webhook）
+
+### 7. SQL 查询引擎
 
 标准 SQL 查询日志：
 ```sql

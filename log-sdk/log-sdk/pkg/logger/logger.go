@@ -1,9 +1,14 @@
-// Package logger 提供高性能日志接口
 package logger
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"sync"
 	"time"
+
+	"github.com/log-system/log-sdk/pkg/async"
+	"github.com/log-system/log-sdk/pkg/strategy"
 )
 
 // Level 日志级别
@@ -18,7 +23,6 @@ const (
 	LevelPanic
 )
 
-// String 返回日志级别字符串
 func (l Level) String() string {
 	switch l {
 	case LevelDebug:
@@ -44,123 +48,220 @@ type Field struct {
 	Value interface{}
 }
 
-// F 快速创建字段
 func F(key string, value interface{}) Field {
 	return Field{Key: key, Value: value}
 }
 
+// LogEntry 日志条目（简化版，只包含基础字段）
+type LogEntry struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Service   string                 `json:"service"`
+	TraceID   string                 `json:"trace_id,omitempty"`
+	SpanID    string                 `json:"span_id,omitempty"`
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+}
+
 // Logger 日志接口
 type Logger interface {
-	// Debug 记录 DEBUG 级别日志
 	Debug(msg string, fields ...Field)
-
-	// Info 记录 INFO 级别日志
 	Info(msg string, fields ...Field)
-
-	// Warn 记录 WARN 级别日志
 	Warn(msg string, fields ...Field)
-
-	// Error 记录 ERROR 级别日志
 	Error(msg string, fields ...Field)
-
-	// Fatal 记录 FATAL 级别日志并退出
 	Fatal(msg string, fields ...Field)
-
-	// Panic 记录 PANIC 级别日志并 panic
 	Panic(msg string, fields ...Field)
-
-	// With 返回带有额外字段的子 logger
 	With(fields ...Field) Logger
-
-	// Close 关闭日志器
 	Close() error
 }
 
 // Config 日志配置
 type Config struct {
-	// Etcd 配置中心地址
+	ServiceName   string
+	Environment   string
+	KafkaBrokers  []string
+	KafkaTopic    string
 	EtcdEndpoints []string
-	// Kafka broker 地址
-	KafkaBrokers []string
-	// Kafka topic
-	KafkaTopic string
-	// 批量大小
-	BatchSize int
-	// 批量超时
-	BatchTimeout time.Duration
-	// OpenTelemetry endpoint
-	OTelEndpoint string
-	// Service name
-	ServiceName string
+	BatchSize     int
+	BatchTimeout  time.Duration
+	// 降级配置
+	FallbackToConsole bool
+	MaxBufferSize     int
 }
 
 // loggerImpl 日志器实现
 type loggerImpl struct {
-	config Config
+	config   Config
+	producer *async.Producer
+	strategy *strategy.Engine
+	fields   []Field
+	mu       sync.RWMutex
+	closed   bool
 }
 
 // New 创建日志器
 func New(cfg Config) Logger {
+	if cfg.BatchSize == 0 {
+		cfg.BatchSize = 100
+	}
+	if cfg.BatchTimeout == 0 {
+		cfg.BatchTimeout = 100 * time.Millisecond
+	}
+	if cfg.MaxBufferSize == 0 {
+		cfg.MaxBufferSize = 10000
+	}
+
+	// 创建异步生产者
+	producer := async.NewProducer(cfg.KafkaBrokers, cfg.BatchSize, cfg.BatchTimeout)
+
+	// 创建策略引擎（如果配置了etcd）
+	var engine *strategy.Engine
+	if len(cfg.EtcdEndpoints) > 0 {
+		var err error
+		engine, err = strategy.NewEngine(cfg.EtcdEndpoints)
+		if err != nil {
+			// 策略引擎失败不影响日志记录
+			println("Failed to create strategy engine:", err.Error())
+		}
+	}
+
 	return &loggerImpl{
-		config: cfg,
+		config:   cfg,
+		producer: producer,
+		strategy: engine,
+		fields:   make([]Field, 0),
 	}
 }
 
-// Debug 记录 DEBUG 级别日志
 func (l *loggerImpl) Debug(msg string, fields ...Field) {
 	l.log(LevelDebug, msg, fields...)
 }
 
-// Info 记录 INFO 级别日志
 func (l *loggerImpl) Info(msg string, fields ...Field) {
 	l.log(LevelInfo, msg, fields...)
 }
 
-// Warn 记录 WARN 级别日志
 func (l *loggerImpl) Warn(msg string, fields ...Field) {
 	l.log(LevelWarn, msg, fields...)
 }
 
-// Error 记录 ERROR 级别日志
 func (l *loggerImpl) Error(msg string, fields ...Field) {
 	l.log(LevelError, msg, fields...)
 }
 
-// Fatal 记录 FATAL 级别日志并退出
 func (l *loggerImpl) Fatal(msg string, fields ...Field) {
 	l.log(LevelFatal, msg, fields...)
+	os.Exit(1)
 }
 
-// Panic 记录 PANIC 级别日志并 panic
 func (l *loggerImpl) Panic(msg string, fields ...Field) {
 	l.log(LevelPanic, msg, fields...)
+	panic(msg)
 }
 
-// With 返回带有额外字段的子 logger
 func (l *loggerImpl) With(fields ...Field) Logger {
-	// TODO: 实现子 logger
-	return l
+	newLogger := &loggerImpl{
+		config:   l.config,
+		producer: l.producer,
+		strategy: l.strategy,
+		fields:   append(l.fields, fields...),
+	}
+	return newLogger
 }
 
-// Close 关闭日志器
 func (l *loggerImpl) Close() error {
-	// TODO: 实现关闭逻辑
-	return nil
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.closed {
+		return nil
+	}
+
+	l.closed = true
+
+	// 关闭策略引擎
+	if l.strategy != nil {
+		l.strategy.Close()
+	}
+
+	// 关闭生产者
+	return l.producer.Close()
 }
 
-// log 内部日志记录方法
 func (l *loggerImpl) log(level Level, msg string, fields ...Field) {
-	// TODO: 实现日志记录逻辑
-	// 1. 构建日志结构
-	// 2. 调用语义化处理器
-	// 3. 写入缓冲区
-	_ = level
-	_ = msg
-	_ = fields
+	l.mu.RLock()
+	if l.closed {
+		l.mu.RUnlock()
+		return
+	}
+	l.mu.RUnlock()
+
+	// 合并字段
+	allFields := make(map[string]interface{})
+	for _, f := range l.fields {
+		allFields[f.Key] = f.Value
+	}
+	for _, f := range fields {
+		allFields[f.Key] = f.Value
+	}
+
+	// 策略评估
+	if l.strategy != nil {
+		decision := l.strategy.Evaluate(level.String(), l.config.ServiceName, l.config.Environment, allFields)
+		if !decision.ShouldLog {
+			return // 被策略过滤
+		}
+	}
+
+	// 构建日志条目（轻量级，不包含复杂语义处理）
+	entry := LogEntry{
+		Timestamp: time.Now().UTC(),
+		Level:     level.String(),
+		Message:   msg,
+		Service:   l.config.ServiceName,
+		Fields:    allFields,
+	}
+
+	// 从context提取trace信息（如果有）
+	if traceID, ok := allFields["trace_id"]; ok {
+		entry.TraceID = traceID.(string)
+	}
+	if spanID, ok := allFields["span_id"]; ok {
+		entry.SpanID = spanID.(string)
+	}
+
+	// 序列化
+	data, err := json.Marshal(entry)
+	if err != nil {
+		// 降级到控制台
+		if l.config.FallbackToConsole {
+			println("LOG ERROR:", err.Error())
+		}
+		return
+	}
+
+	// 异步发送
+	msg2 := async.LogMessage{
+		Topic: l.config.KafkaTopic,
+		Key:   entry.Service,
+		Value: data,
+		Headers: map[string]string{
+			"level":   entry.Level,
+			"service": entry.Service,
+		},
+	}
+
+	if err := l.producer.Send(msg2); err != nil {
+		// 发送失败，降级到控制台
+		if l.config.FallbackToConsole {
+			println(string(data))
+		}
+	}
 }
 
-// WithContext 返回带有上下文的 logger
+// WithContext 从context创建logger
 func WithContext(ctx context.Context, l Logger) Logger {
-	// TODO: 从上下文提取 traceId/spanId 等信息
+	// 从context提取trace信息
+	// 简化实现，实际应集成OpenTelemetry
 	return l
 }

@@ -21,7 +21,6 @@
 - [ ] PostgreSQL 单实例部署
 - [ ] Redis 单实例部署
 - [ ] Elasticsearch 集群部署 (3节点)
-- [ ] Flink Standalone 集群部署
 
 #### 1.3 可观测性基础
 - [ ] OpenTelemetry Collector 部署
@@ -34,151 +33,110 @@
 
 ### 第二阶段：SDK 核心开发 (Week 3-5)
 
-#### 2.1 Logger API 模块
-- [ ] 接口设计 (ILogger, Logger)
+#### 2.1 pkg/logger 模块
+- [ ] Logger 接口设计
 - [ ] 日志级别定义与实现
 - [ ] 结构化字段支持
-- [ ] 日志格式化器接口
-- [ ] 输出接口 (Output/Sync)
+- [ ] Options 配置
 - [ ] 单元测试
 
-#### 2.2 异步 I/O 模块
-- [ ] 环形缓冲区实现 (无锁或CAS)
+#### 2.2 pkg/guard 模块
+- [ ] HTTP Middleware 实现
+- [ ] 请求生命周期钩子
+- [ ] 自动日志记录
+- [ ] 上下文传递
+
+#### 2.3 pkg/strategy 模块
+- [ ] 策略引擎核心实现
+- [ ] Etcd Watcher 实现
+- [ ] 配置热加载机制
+- [ ] 策略缓存
+
+#### 2.4 pkg/async 模块
 - [ ] Worker Pool 实现
 - [ ] Kafka Producer 封装
 - [ ] 批量发送逻辑
-- [ ] 连接池管理
+- [ ] 环形缓冲区实现
 - [ ] 背压处理
 - [ ] 性能基准测试
 
-#### 2.3 编码器模块
+#### 2.5 pkg/encoder 模块
 - [ ] JSON 编码器
-- [ ] Protobuf 编码器
-- [ ] Avro 编码器
-- [ ] 编码器接口与注册机制
-- [ ] Schema 管理器
+- [ ] 编码器接口
 
 ---
 
-### 第三阶段：策略引擎开发 (Week 6-7)
+### 第三阶段：Log Processor 开发 (Week 6-7)
 
-#### 3.1 策略引擎核心
-- [ ] 策略规则定义 (DSL/JSON)
-- [ ] 策略解析器实现
-- [ ] 策略匹配引擎
-- [ ] 策略缓存机制
+#### 3.1 pkg/parser 模块
+- [ ] Parser 接口设计
+- [ ] JSON Parser 实现
+- [ ] Regex Parser 实现
+- [ ] 多格式解析器
 
-#### 3.2 动态配置集成
-- [ ] Etcd Watcher 实现
-- [ ] 配置热加载机制
-- [ ] 配置版本管理
-- [ ] 配置回滚支持
-- [ ] 配置验证器
+#### 3.2 pkg/semantic 模块
+- [ ] Semantic Builder 实现
+- [ ] HTTP 上下文提取
+- [ ] User 上下文提取
+- [ ] Error 信息提取
+- [ ] 业务域推断
 
-#### 3.3 策略规则示例
-- [ ] 日志级别过滤规则
-- [ ] 路由策略规则
-- [ ] 采样策略规则
-- [ ] 脱敏策略规则
+#### 3.3 pkg/enricher 模块
+- [ ] 时间字段识别
+- [ ] IP 地理位置解析
+- [ ] User Agent 解析
+
+#### 3.4 pkg/sink 模块
+- [ ] Elasticsearch Sink
+- [ ] Console Sink
+- [ ] Webhook Sink (告警)
 
 ---
 
-### 第四阶段：语义化处理 (Week 8-9)
+### 第四阶段：OpenTelemetry 集成 (Week 8-9)
 
-#### 4.1 语义上下文构建器
-- [ ] 上下文提取器接口
-- [ ] HTTP 请求上下文提取
-- [ ] gRPC 请求上下文提取
-- [ ] 自定义字段提取器
-- [ ] 上下文合并策略
-
-#### 4.2 OpenTelemetry 集成
+#### 4.1 Tracing 集成
 - [ ] Tracing Provider 初始化
 - [ ] Span 自动创建与传播
 - [ ] TraceID/SpanID 注入日志
 - [ ] Baggage 上下文提取
-- [ ] Metrics 集成
 
-#### 4.3 语义增强器
-- [ ] 时间字段自动识别
-- [ ] IP 地址地理位置解析
-- [ ] User Agent 解析
-- [ ] 异常堆栈标准化
-- [ ] 自定义语义插件机制
+#### 4.2 Metrics 集成
+- [ ] 指标导出器配置
+- [ ] 自定义指标定义
+- [ ] Prometheus 集成
 
 ---
 
-### 第五阶段：SDK 集成与 Guard (Week 10)
+### 第五阶段：控制面开发 (Week 10-11)
 
-#### 5.1 Guard 拦截器
-- [ ] HTTP Middleware 实现 (Gin/Echo/Chi)
-- [ ] gRPC Interceptor 实现
-- [ ] 请求生命周期钩子
-- [ ] 日志上下文传递
+#### 5.1 Config Server
+- [ ] REST API 设计
+- [ ] 策略 CRUD 接口
+- [ ] 配置历史查询
+- [ ] API 认证与授权
 
-#### 5.2 SDK 整合
-- [ ] SDK 配置初始化
-- [ ] 全局单例管理
-- [ ] 优雅关闭处理
-- [ ] 健康检查接口
+#### 5.2 Frontend 管理面板
+- [ ] 前端框架搭建 (React + Vite)
+- [ ] 策略配置 UI
+- [ ] 日志查询 UI
+- [ ] 系统监控 Dashboard
 
 #### 5.3 示例应用
 - [ ] HTTP 服务示例
-- [ ] gRPC 服务示例
 - [ ] 性能压测脚本
 
 ---
 
-### 第六阶段：控制面开发 (Week 11-12)
+### 第六阶段：Log Analyzer 开发 (Week 12-13)
 
-#### 6.1 配置 API 服务
-- [ ] REST API 设计
-- [ ] 策略 CRUD 接口
-- [ ] 配置历史查询
-- [ ] 配置审批流程 (可选)
-- [ ] API 认证与授权
-
-#### 6.2 管理面板
-- [ ] 前端框架搭建 (React/Vue)
-- [ ] 策略配置 UI
-- [ ] 日志查询 UI
-- [ ] 系统监控 Dashboard
-- [ ] 实时日志流展示
-
----
-
-### 第七阶段：流处理 (Week 13-14)
-
-#### 7.1 Flink Job 开发
-- [ ] Kafka Source Connector
-- [ ] 模式解析算子
-  - [ ] 正则模式匹配
-  - [ ] JSON 结构提取
-  - [ ] 模式学习机制
-- [ ] 语义验证算子
-- [ ] 上下文增强算子
-- [ ] 时间窗口聚合算子
-- [ ] Elasticsearch Sink Connector
-
-#### 7.2 Flink 运维
-- [ ] Job 打包与部署
-- [ ] Checkpoint 配置
-- [ ] Savepoint 管理
-- [ ] 故障恢复测试
-- [ ] 背压监控
-
----
-
-### 第八阶段：分析服务 (Week 15)
-
-#### 8.1 SQL 查询引擎
+#### 6.1 SQL 查询引擎
 - [ ] SQL 解析器集成
 - [ ] SQL 到 ES DSL 转换
 - [ ] 查询优化器
-- [ ] 结果聚合
-- [ ] 分页支持
+- [ ] 结果聚合与分页
 
-#### 8.2 自动报告生成
+#### 6.2 自动报告生成
 - [ ] 日志模式分析器
 - [ ] 异常模式检测
 - [ ] 报告模板引擎
@@ -187,46 +145,43 @@
 
 ---
 
-### 第九阶段：测试与优化 (Week 16-17)
+### 第七阶段：测试与优化 (Week 14-15)
 
-#### 9.1 测试完善
+#### 7.1 测试完善
 - [ ] 单元测试覆盖率 80%+
 - [ ] 集成测试套件
 - [ ] 端到端测试
-- [ ] 混沌测试
 - [ ] 性能压测与调优
 
-#### 9.2 性能优化
+#### 7.2 性能优化
 - [ ] 日志写入吞吐量优化
 - [ ] 内存占用优化
 - [ ] GC 调优
 - [ ] 网络传输优化
-- [ ] 批量写入大小调优
 
-#### 9.3 文档完善
+#### 7.3 文档完善
 - [ ] API 文档
 - [ ] SDK 使用文档
 - [ ] 部署运维文档
-- [ ] 故障排查指南
 
 ---
 
-### 第十阶段：生产准备 (Week 18)
+### 第八阶段：生产准备 (Week 16-18)
 
-#### 10.1 生产部署
+#### 8.1 生产部署
 - [ ] 生产环境清单
 - [ ] 部署脚本完善
 - [ ] 监控告警配置
 - [ ] 日志收集配置
 - [ ] 备份恢复方案
 
-#### 10.2 安全加固
+#### 8.2 安全加固
 - [ ] 敏感信息加密
 - [ ] 访问控制配置
 - [ ] 审计日志启用
 - [ ] 安全扫描
 
-#### 10.3 发布准备
+#### 8.3 发布准备
 - [ ] Release Notes
 - [ ] 版本标签
 - [ ] 部署流程文档
@@ -239,15 +194,13 @@
 | 里程碑 | 预期完成时间 | 交付物 |
 |--------|-------------|--------|
 | M1: 基础设施就绪 | Week 2 | 完整的 Docker Compose/K8s 部署 |
-| M2: SDK 核心完成 | Week 5 | Logger/Async/Encoder 模块 |
-| M3: 策略引擎完成 | Week 7 | 动态配置 + 策略匹配 |
-| M4: 语义化完成 | Week 9 | 上下文构建 + OTEL 集成 |
-| M5: SDK 集成完成 | Week 10 | 完整 SDK + 示例应用 |
-| M6: 控制面完成 | Week 12 | API + 管理面板 |
-| M7: 流处理完成 | Week 14 | Flink Job + 处理管线 |
-| M8: 分析服务完成 | Week 15 | SQL 查询 + 自动报告 |
-| M9: 测试完成 | Week 17 | 完整测试套件 + 文档 |
-| M10: 生产就绪 | Week 18 | 可发布版本 |
+| M2: SDK 核心完成 | Week 5 | pkg/logger/guard/strategy/async/encoder |
+| M3: Log Processor 完成 | Week 7 | pkg/parser/semantic/enricher/sink |
+| M4: OTEL 集成完成 | Week 9 | Tracing + Metrics 集成 |
+| M5: 控制面完成 | Week 11 | Config Server + Frontend |
+| M6: Log Analyzer 完成 | Week 13 | SQL 查询 + 自动报告 |
+| M7: 测试完成 | Week 15 | 完整测试套件 + 文档 |
+| M8: 生产就绪 | Week 18 | 可发布版本 |
 
 ---
 
@@ -285,12 +238,12 @@
 | SDK语言 | Go 1.18+ |
 | 配置中心 | Etcd 3.5+ |
 | 消息队列 | Kafka 2.8+ |
-| 流处理 | Flink 1.15+ |
+| 日志处理 | Log Processor (Go) |
 | 日志存储 | Elasticsearch 7.17+ |
 | 关系存储 | PostgreSQL 14+ |
 | 缓存 | Redis 7+ |
 | 链路追踪 | OpenTelemetry + Jaeger |
 | 指标监控 | Prometheus + Grafana |
-| 日志分析 | Kibana |
-| 前端框架 | React/Vue 3 |
+| 日志分析 | Kibana + SQL 查询引擎 |
+| 前端框架 | React + Vite |
 | 容器编排 | Kubernetes / Docker Compose |
