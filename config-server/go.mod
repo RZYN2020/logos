@@ -1,6 +1,6 @@
 module github.com/log-system/config-server
 
-go 1.18
+go 1.25
 
 require (
 	github.com/coreos/etcd/client/v3 v3.5.9

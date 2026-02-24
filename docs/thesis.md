@@ -83,6 +83,24 @@
 
 # 第二章 相关技术综述
 
+## 2.1 GoLang
+
+## 2.2 Etcd
+
+## 2.3 Kibana
+
+## 2.4 OpenTelemetry
+
+## 2.5 React
+
+## 2.6 Gin
+
+## 2.7 Elasticsearch
+
+## 2.8 Kafka
+
+## 2.9 本章小节 
+
 # 第三章 日志系统分析与设计
 
 ## 3.1 系统整体概述
@@ -568,6 +586,24 @@ sequenceDiagram
 ## 3.4 日志系统模块设计
 
 ### 3.4.1 SDK 设计
+
+
+
+https://darjun.github.io/2020/02/07/godailylib/log/
+
+
+
+https://darjun.github.io/2020/02/07/godailylib/logrus/
+
+
+
+https://darjun.github.io/2020/04/23/godailylib/zap/
+
+https://darjun.github.io/2020/04/24/godailylib/zerolog/
+
+
+
+
 
 ### 3.4.2 Log Processor 设计
 
