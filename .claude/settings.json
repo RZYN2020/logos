@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(go run http/main.go)",
-      "Bash(go run sdk/main.go)"
+      "Bash(go run sdk/main.go)",
+      "Bash(go test ./...)",
+      "Bash(openspec show:*)"
     ]
   }
 }
