@@ -316,16 +316,256 @@ curl http://localhost:8080/ping
 
 ### Kubernetes 部署
 
+#### 前置要求
+
+1. **Kubernetes 集群**：可以使用以下方式之一：
+   - **Minikube**：本地单节点 Kubernetes 集群
+   - **云服务商**：AWS EKS、GCP GKE、Azure AKS 等
+   - **本地集群**：Kind 或 K3s
+
+2. **Helm**：版本 3.x+（用于部署 Helm Chart）
+
+3. **kubectl**：与 Kubernetes 集群版本匹配的命令行工具
+
+#### 部署步骤
+
+##### 1. 创建命名空间
+
 ```bash
-# 创建命名空间
-kubectl create namespace logging
-
-# 部署基础设施
-make deploy
-
-# 部署应用服务
-make deploy-app
+kubectl create namespace logging-system
+kubectl create namespace monitoring
 ```
+
+##### 2. 部署基础设施服务（使用 Helm）
+
+```bash
+# 部署 Etcd 配置中心
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm install etcd bitnami/etcd -n logging-system \
+  --set replicaCount=1 \
+  --set auth.rbac.enabled=false
+
+# 部署 Kafka 消息队列
+helm install kafka bitnami/kafka -n logging-system \
+  --set replicas=1 \
+  --set zookeeper.replicaCount=1 \
+  --set allowPlaintextListener=true
+
+# 部署 Elasticsearch 存储
+helm repo add elastic https://helm.elastic.co
+helm install elasticsearch elastic/elasticsearch -n logging-system \
+  --set replicas=1 \
+  --set resources.requests.memory=2Gi \
+  --set resources.limits.memory=4Gi \
+  --set http.cors.enabled=true \
+  --set http.cors.allowOrigin="*"
+
+# 部署 Kibana（可选，用于直接查看 Elasticsearch 数据）
+helm install kibana elastic/kibana -n logging-system \
+  --set elasticsearchHosts=http://elasticsearch-master:9200
+```
+
+##### 3. 部署监控和日志收集系统
+
+```bash
+# 部署 Prometheus 和 Grafana
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/prometheus -n monitoring \
+  --set alertmanager.enabled=false
+
+helm install grafana prometheus-community/grafana -n monitoring \
+  --set service.type=NodePort \
+  --set service.nodePort=3000 \
+  --set adminPassword=admin
+
+# 部署 Jaeger（用于分布式追踪）
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm install jaeger jaegertracing/jaeger -n monitoring \
+  --set query.service.type=NodePort \
+  --set query.service.nodePort=16686
+```
+
+##### 4. 部署项目应用服务
+
+```bash
+# 进入部署目录
+cd deploy/k8s/helm
+
+# 部署配置服务器
+helm install config-server . -n logging-system \
+  --set config-server.image.tag=latest \
+  --set etcd.endpoints=etcd.logging-system.svc.cluster.local:2379
+
+# 部署日志处理器
+helm install log-processor . -n logging-system \
+  --set log-processor.image.tag=latest \
+  --set kafka.brokers=kafka-headless.logging-system.svc.cluster.local:9092 \
+  --set elasticsearch.url=http://elasticsearch-master.logging-system.svc.cluster.local:9200
+
+# 部署日志分析器（可选）
+helm install log-analyzer . -n logging-system \
+  --set log-analyzer.image.tag=latest \
+  --set elasticsearch.url=http://elasticsearch-master.logging-system.svc.cluster.local:9200
+
+# 部署前端应用
+helm install frontend . -n logging-system \
+  --set frontend.image.tag=latest \
+  --set config-server.url=http://config-server.logging-system.svc.cluster.local:8080
+```
+
+##### 5. 验证部署
+
+```bash
+# 查看命名空间下的所有资源
+kubectl get all -n logging-system
+kubectl get all -n monitoring
+
+# 检查 Pod 状态
+kubectl get pods -n logging-system -w
+
+# 查看服务访问地址
+kubectl get services -n logging-system
+kubectl get services -n monitoring
+```
+
+##### 6. 访问应用
+
+- **前端界面**：通过浏览器访问 Frontend 服务的 NodePort 或 LoadBalancer 地址
+- **配置服务器 API**：通过 Postman 或 curl 访问 Config Server 的地址（端口 8080）
+- **监控系统**：Grafana（地址：http://<cluster-ip>:3000，用户名/密码：admin/admin）
+- **分布式追踪**：Jaeger UI（地址：http://<cluster-ip>:16686）
+
+#### 卸载
+
+```bash
+# 卸载应用服务
+helm uninstall config-server log-processor log-analyzer frontend -n logging-system
+
+# 卸载基础设施
+helm uninstall etcd kafka elasticsearch kibana -n logging-system
+
+# 卸载监控系统
+helm uninstall prometheus grafana jaeger -n monitoring
+
+# 删除命名空间
+kubectl delete namespace logging-system
+kubectl delete namespace monitoring
+```
+
+### 组件搭建说明
+
+#### 1. Etcd 配置中心
+
+**用途**：存储和监控策略配置的动态变更
+
+**部署配置**：
+- 使用 Bitnami Helm Chart 部署
+- 默认副本数：1（生产环境建议 3+ 节点）
+- 资源限制：CPU 0.5 核，内存 512MB
+- 数据存储：使用 PVC（默认 8GB）
+
+**访问方式**：
+- 内部访问：`etcd.logging-system.svc.cluster.local:2379`
+- 外部访问：使用 NodePort 或 LoadBalancer 服务
+
+#### 2. Kafka 消息队列
+
+**用途**：缓冲和传输高吞吐量的日志数据
+
+**部署配置**：
+- 使用 Bitnami Helm Chart 部署
+- 包含 ZooKeeper（用于 Kafka 协调）
+- 默认副本数：1（生产环境建议 3+ 节点）
+- 资源限制：CPU 1 核，内存 2GB
+- 数据存储：使用 PVC（默认 10GB）
+
+**访问方式**：
+- 内部访问：`kafka-headless.logging-system.svc.cluster.local:9092`
+- 外部访问：使用 NodePort 或 LoadBalancer 服务（端口 9094）
+
+#### 3. Elasticsearch 存储
+
+**用途**：存储和索引结构化日志数据
+
+**部署配置**：
+- 使用 Elastic 官方 Helm Chart 部署
+- 默认副本数：1（生产环境建议 3+ 节点）
+- 资源限制：CPU 2 核，内存 4GB
+- 数据存储：使用 PVC（默认 30GB）
+
+**访问方式**：
+- 内部访问：`http://elasticsearch-master.logging-system.svc.cluster.local:9200`
+- 外部访问：使用 NodePort 或 LoadBalancer 服务（端口 9200）
+
+#### 4. 应用服务
+
+**配置服务器**（Config Server）：
+- 用途：管理策略配置的 API 服务
+- 部署方式：Docker 镜像 + Kubernetes Deployment
+- 资源限制：CPU 0.5 核，内存 512MB
+- 依赖：Etcd
+
+**日志处理器**（Log Processor）：
+- 用途：消费 Kafka 日志，进行解析和语义增强，写入 Elasticsearch
+- 部署方式：Docker 镜像 + Kubernetes Deployment
+- 资源限制：CPU 1 核，内存 1GB
+- 依赖：Kafka、Elasticsearch
+
+**前端应用**（Frontend）：
+- 用途：管理和监控界面
+- 部署方式：Docker 镜像 + Kubernetes Deployment
+- 资源限制：CPU 0.2 核，内存 256MB
+- 依赖：Config Server
+
+#### 5. 监控和日志收集
+
+**Prometheus**：
+- 用途：指标收集和查询
+- 部署方式：Helm Chart
+- 资源限制：CPU 1 核，内存 2GB
+- 存储：使用 PVC（默认 8GB）
+
+**Grafana**：
+- 用途：指标可视化
+- 部署方式：Helm Chart
+- 资源限制：CPU 0.5 核，内存 512MB
+- 访问：NodePort 3000（默认用户名/密码：admin/admin）
+
+**Jaeger**：
+- 用途：分布式追踪
+- 部署方式：Helm Chart
+- 资源限制：CPU 0.5 核，内存 1GB
+- 访问：NodePort 16686
+
+### 常见问题
+
+#### 1. 服务无法访问
+
+**解决方案**：
+- 检查 Pod 状态是否正常：`kubectl get pods -n logging-system`
+- 检查服务是否已创建：`kubectl get services -n logging-system`
+- 检查网络策略是否允许访问：`kubectl get networkpolicies -n logging-system`
+
+#### 2. 存储卷无法挂载
+
+**解决方案**：
+- 检查存储类是否已配置：`kubectl get storageclasses`
+- 检查 PVC 是否已绑定：`kubectl get pvc -n logging-system`
+- 检查存储资源是否充足
+
+#### 3. Kafka 连接失败
+
+**解决方案**：
+- 检查 Kafka Pod 状态：`kubectl get pods -n logging-system`
+- 检查 Kafka 服务是否正常：`kubectl port-forward service/kafka 9092:9092 -n logging-system`
+- 使用 Kafka 客户端工具测试连接
+
+#### 4. Elasticsearch 健康检查失败
+
+**解决方案**：
+- 检查 Elasticsearch Pod 状态：`kubectl get pods -n logging-system`
+- 检查 Elasticsearch 日志：`kubectl logs -f <elasticsearch-pod-name> -n logging-system`
+- 检查内存使用情况：`kubectl top pods -n logging-system`
 
 ### 生产环境检查清单
 
