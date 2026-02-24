@@ -7,7 +7,20 @@
 ## 核心特性
 
 ### 1. API 设计
-- 类似 Zap 的链式调用风格，但更轻量
+- **传统打印方式**：类似 log.Printf，直接打印字符串
+  ```go
+  log.Printf("Hello %s, you have %d new messages", name, count)
+  ```
+
+- **强类型链式打印方式**：类似 Zap/ZeroLog，支持链式调用和结构化字段
+  ```go
+  log.Info("User logged in").
+      Str("username", "john.doe").
+      Int("login_count", 42).
+      Float64("balance", 123.45).
+      Send()
+  ```
+
 - 支持结构化日志字段（key-value 对）
 - 支持日志级别（Debug/Info/Warn/Error/Fatal/Panic）
 - 支持上下文传播（通过 context.Context）

@@ -7,13 +7,18 @@
 ```go
 // Logger 是日志记录的核心接口
 type Logger interface {
-	// 日志级别方法
-	Debug(msg string, fields ...Field)
-	Info(msg string, fields ...Field)
-	Warn(msg string, fields ...Field)
-	Error(msg string, fields ...Field)
-	Fatal(msg string, fields ...Field)
-	Panic(msg string, fields ...Field)
+	// 传统打印方式
+	Printf(format string, args ...interface{})
+	Println(args ...interface{})
+	Print(args ...interface{})
+
+	// 强类型链式打印方式
+	Debug(msg string, fields ...Field) *LogBuilder
+	Info(msg string, fields ...Field) *LogBuilder
+	Warn(msg string, fields ...Field) *LogBuilder
+	Error(msg string, fields ...Field) *LogBuilder
+	Fatal(msg string, fields ...Field) *LogBuilder
+	Panic(msg string, fields ...Field) *LogBuilder
 
 	// 上下文和字段管理
 	With(fields ...Field) Logger
@@ -24,6 +29,41 @@ type Logger interface {
 
 	// 生命周期管理
 	Close() error
+}
+
+// LogBuilder 用于强类型链式打印
+type LogBuilder struct {
+	logger *loggerImpl
+	entry  LogEntry
+}
+
+func (b *LogBuilder) Str(key, value string) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Int(key string, value int) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Int64(key string, value int64) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Float64(key string, value float64) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Bool(key string, value bool) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Send() {
+	b.logger.logEntry(b.entry)
 }
 ```
 

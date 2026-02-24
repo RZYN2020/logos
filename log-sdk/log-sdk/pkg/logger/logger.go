@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"runtime"
 	"sync"
@@ -130,16 +131,63 @@ type LogEntry struct {
 
 // Logger 日志接口
 type Logger interface {
-	Debug(msg string, fields ...Field)
-	Info(msg string, fields ...Field)
-	Warn(msg string, fields ...Field)
-	Error(msg string, fields ...Field)
-	Fatal(msg string, fields ...Field)
-	Panic(msg string, fields ...Field)
+	// 传统打印方式
+	Printf(format string, args ...interface{})
+	Println(args ...interface{})
+	Print(args ...interface{})
+
+	// 强类型链式打印方式
+	Debug(msg string, fields ...Field) *LogBuilder
+	Info(msg string, fields ...Field) *LogBuilder
+	Warn(msg string, fields ...Field) *LogBuilder
+	Error(msg string, fields ...Field) *LogBuilder
+	Fatal(msg string, fields ...Field) *LogBuilder
+	Panic(msg string, fields ...Field) *LogBuilder
+
+	// 上下文和字段管理
 	With(fields ...Field) Logger
 	WithContext(ctx context.Context) Logger
+
+	// Hook 管理
 	AddHook(h Hook) Logger
+
+	// 生命周期管理
 	Close() error
+}
+
+// LogBuilder 用于强类型链式打印
+type LogBuilder struct {
+	logger *loggerImpl
+	entry  LogEntry
+}
+
+func (b *LogBuilder) Str(key, value string) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Int(key string, value int) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Int64(key string, value int64) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Float64(key string, value float64) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Bool(key string, value bool) *LogBuilder {
+	b.entry.Fields[key] = value
+	return b
+}
+
+func (b *LogBuilder) Send() {
+	b.logger.logEntry(b.entry)
 }
 
 // Config 日志配置
@@ -204,30 +252,156 @@ func New(cfg Config) Logger {
 	}
 }
 
-func (l *loggerImpl) Debug(msg string, fields ...Field) {
-	l.log(LevelDebug, msg, fields...)
+func (l *loggerImpl) Printf(format string, args ...interface{}) {
+	l.log(LevelInfo, sprintf(format, args...))
 }
 
-func (l *loggerImpl) Info(msg string, fields ...Field) {
-	l.log(LevelInfo, msg, fields...)
+func (l *loggerImpl) Println(args ...interface{}) {
+	l.log(LevelInfo, sprintln(args...))
 }
 
-func (l *loggerImpl) Warn(msg string, fields ...Field) {
-	l.log(LevelWarn, msg, fields...)
+func (l *loggerImpl) Print(args ...interface{}) {
+	l.log(LevelInfo, sprint(args...))
 }
 
-func (l *loggerImpl) Error(msg string, fields ...Field) {
-	l.log(LevelError, msg, fields...)
+func (l *loggerImpl) Debug(msg string, fields ...Field) *LogBuilder {
+	return l.newLogBuilder(LevelDebug, msg, fields...)
 }
 
-func (l *loggerImpl) Fatal(msg string, fields ...Field) {
-	l.log(LevelFatal, msg, fields...)
-	os.Exit(1)
+func (l *loggerImpl) Info(msg string, fields ...Field) *LogBuilder {
+	return l.newLogBuilder(LevelInfo, msg, fields...)
 }
 
-func (l *loggerImpl) Panic(msg string, fields ...Field) {
-	l.log(LevelPanic, msg, fields...)
-	panic(msg)
+func (l *loggerImpl) Warn(msg string, fields ...Field) *LogBuilder {
+	return l.newLogBuilder(LevelWarn, msg, fields...)
+}
+
+func (l *loggerImpl) Error(msg string, fields ...Field) *LogBuilder {
+	return l.newLogBuilder(LevelError, msg, fields...)
+}
+
+func (l *loggerImpl) Fatal(msg string, fields ...Field) *LogBuilder {
+	builder := l.newLogBuilder(LevelFatal, msg, fields...)
+	return &LogBuilder{
+		logger: l,
+		entry:  builder.entry,
+	}
+}
+
+func (l *loggerImpl) Panic(msg string, fields ...Field) *LogBuilder {
+	builder := l.newLogBuilder(LevelPanic, msg, fields...)
+	return &LogBuilder{
+		logger: l,
+		entry:  builder.entry,
+	}
+}
+
+func (l *loggerImpl) newLogBuilder(level Level, msg string, fields ...Field) *LogBuilder {
+	l.mu.RLock()
+	if l.closed {
+		l.mu.RUnlock()
+		return &LogBuilder{} // 返回空 builder，Send() 会忽略
+	}
+	l.mu.RUnlock()
+
+	_, file, line, ok := runtime.Caller(2)
+	function := "unknown"
+	if ok {
+		pc, _, _, _ := runtime.Caller(2)
+		function = runtime.FuncForPC(pc).Name()
+	}
+
+	allFields := make(map[string]interface{})
+	for _, f := range l.fields {
+		allFields[f.Key] = f.Value
+	}
+	for _, f := range fields {
+		allFields[f.Key] = f.Value
+	}
+
+	entry := LogEntry{
+		Timestamp: time.Now().UTC(),
+		Level:     level.String(),
+		Message:   msg,
+		Service:   l.config.ServiceName,
+		Cluster:   l.config.Cluster,
+		Pod:       l.config.Pod,
+		Fields:    allFields,
+		File:      file,
+		Line:      line,
+		Function:  function,
+	}
+
+	return &LogBuilder{
+		logger: l,
+		entry:  entry,
+	}
+}
+
+func (l *loggerImpl) logEntry(entry LogEntry) {
+	for _, h := range l.hooks {
+		if !h.OnLog(entry) {
+			return
+		}
+	}
+
+	if l.strategy != nil {
+		decision := l.strategy.Evaluate(entry.Level, l.config.ServiceName, l.config.Environment, entry.Fields)
+		if !decision.ShouldLog {
+			return
+		}
+	}
+
+	if traceID, ok := entry.Fields["trace_id"]; ok {
+		entry.TraceID = traceID.(string)
+	}
+	if spanID, ok := entry.Fields["span_id"]; ok {
+		entry.SpanID = spanID.(string)
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		if l.config.FallbackToConsole {
+			println("LOG ERROR:", err.Error())
+		}
+		return
+	}
+
+	msg := async.LogMessage{
+		Topic: l.config.KafkaTopic,
+		Key:   entry.Service,
+		Value: data,
+		Headers: map[string]string{
+			"level":   entry.Level,
+			"service": entry.Service,
+		},
+	}
+
+	if err := l.producer.Send(msg); err != nil {
+		if l.config.FallbackToConsole {
+			println(string(data))
+		}
+	}
+
+	if entry.Level == LevelFatal.String() {
+		os.Exit(1)
+	}
+
+	if entry.Level == LevelPanic.String() {
+		panic(entry.Message)
+	}
+}
+
+func sprintf(format string, args ...interface{}) string {
+	return fmt.Sprintf(format, args...)
+}
+
+func sprintln(args ...interface{}) string {
+	return fmt.Sprintln(args...)
+}
+
+func sprint(args ...interface{}) string {
+	return fmt.Sprint(args...)
 }
 
 func (l *loggerImpl) With(fields ...Field) Logger {
