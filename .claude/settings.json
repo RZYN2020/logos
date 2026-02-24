@@ -5,7 +5,9 @@
       "Bash(go run sdk/main.go)",
       "Bash(go test ./...)",
       "Bash(openspec show:*)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(openspec instructions specs --change:*)",
+      "Bash(go list:*)"
     ]
   }
 }

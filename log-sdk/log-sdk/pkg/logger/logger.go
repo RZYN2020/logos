@@ -547,3 +547,40 @@ func WithContext(ctx context.Context, l Logger) Logger {
 	// 简化实现，实际应集成OpenTelemetry
 	return l
 }
+
+// logEntryPool 是 LogEntry 对象池，用于减少 GC 压力
+var logEntryPool = sync.Pool{
+	New: func() interface{} {
+		return &LogEntry{
+			Fields: make(map[string]interface{}, 8),
+		}
+	},
+}
+
+// acquireLogEntry 从对象池获取 LogEntry
+func acquireLogEntry() *LogEntry {
+	entry := logEntryPool.Get().(*LogEntry)
+	// 重置字段
+	entry.Timestamp = time.Time{}
+	entry.Level = ""
+	entry.Message = ""
+	entry.File = ""
+	entry.Line = 0
+	entry.Function = ""
+	for k := range entry.Fields {
+		delete(entry.Fields, k)
+	}
+	return entry
+}
+
+// releaseLogEntry 将 LogEntry 归还到对象池
+func releaseLogEntry(entry *LogEntry) {
+	if entry == nil {
+		return
+	}
+	// 清理字段避免内存泄漏
+	for k := range entry.Fields {
+		delete(entry.Fields, k)
+	}
+	logEntryPool.Put(entry)
+}
