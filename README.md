@@ -329,91 +329,15 @@ curl http://localhost:8080/ping
 
 #### 部署步骤
 
-##### 1. 创建命名空间
+##### 1. 部署 Logos Platform
 
 ```bash
-kubectl create namespace logging-system
-kubectl create namespace monitoring
+cd deploy/k8s/scripts
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-##### 2. 部署基础设施服务（使用 Helm）
-
-```bash
-# 部署 Etcd 配置中心
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install etcd bitnami/etcd -n logging-system \
-  --set replicaCount=1 \
-  --set auth.rbac.enabled=false
-
-# 部署 Kafka 消息队列
-helm install kafka bitnami/kafka -n logging-system \
-  --set replicas=1 \
-  --set zookeeper.replicaCount=1 \
-  --set allowPlaintextListener=true
-
-# 部署 Elasticsearch 存储
-helm repo add elastic https://helm.elastic.co
-helm install elasticsearch elastic/elasticsearch -n logging-system \
-  --set replicas=1 \
-  --set resources.requests.memory=2Gi \
-  --set resources.limits.memory=4Gi \
-  --set http.cors.enabled=true \
-  --set http.cors.allowOrigin="*"
-
-# 部署 Kibana（可选，用于直接查看 Elasticsearch 数据）
-helm install kibana elastic/kibana -n logging-system \
-  --set elasticsearchHosts=http://elasticsearch-master:9200
-```
-
-##### 3. 部署监控和日志收集系统
-
-```bash
-# 部署 Prometheus 和 Grafana
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install prometheus prometheus-community/prometheus -n monitoring \
-  --set alertmanager.enabled=false
-
-helm install grafana prometheus-community/grafana -n monitoring \
-  --set service.type=NodePort \
-  --set service.nodePort=3000 \
-  --set adminPassword=admin
-
-# 部署 Jaeger（用于分布式追踪）
-helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
-helm install jaeger jaegertracing/jaeger -n monitoring \
-  --set query.service.type=NodePort \
-  --set query.service.nodePort=16686
-```
-
-##### 4. 部署项目应用服务
-
-```bash
-# 进入部署目录
-cd deploy/k8s/helm
-
-# 部署配置服务器
-helm install config-server . -n logging-system \
-  --set config-server.image.tag=latest \
-  --set etcd.endpoints=etcd.logging-system.svc.cluster.local:2379
-
-# 部署日志处理器
-helm install log-processor . -n logging-system \
-  --set log-processor.image.tag=latest \
-  --set kafka.brokers=kafka-headless.logging-system.svc.cluster.local:9092 \
-  --set elasticsearch.url=http://elasticsearch-master.logging-system.svc.cluster.local:9200
-
-# 部署日志分析器（可选）
-helm install log-analyzer . -n logging-system \
-  --set log-analyzer.image.tag=latest \
-  --set elasticsearch.url=http://elasticsearch-master.logging-system.svc.cluster.local:9200
-
-# 部署前端应用
-helm install frontend . -n logging-system \
-  --set frontend.image.tag=latest \
-  --set config-server.url=http://config-server.logging-system.svc.cluster.local:8080
-```
-
-##### 5. 验证部署
+##### 2. 验证部署
 
 ```bash
 # 查看命名空间下的所有资源
@@ -428,28 +352,18 @@ kubectl get services -n logging-system
 kubectl get services -n monitoring
 ```
 
-##### 6. 访问应用
+##### 3. 访问应用
 
 - **前端界面**：通过浏览器访问 Frontend 服务的 NodePort 或 LoadBalancer 地址
 - **配置服务器 API**：通过 Postman 或 curl 访问 Config Server 的地址（端口 8080）
-- **监控系统**：Grafana（地址：http://<cluster-ip>:3000，用户名/密码：admin/admin）
-- **分布式追踪**：Jaeger UI（地址：http://<cluster-ip>:16686）
+- **监控系统**：Grafana（地址：http://<cluster-ip>:30300，用户名/密码：admin/admin123）
+- **分布式追踪**：Jaeger UI（地址：http://<cluster-ip>:31686）
 
 #### 卸载
 
 ```bash
-# 卸载应用服务
-helm uninstall config-server log-processor log-analyzer frontend -n logging-system
-
-# 卸载基础设施
-helm uninstall etcd kafka elasticsearch kibana -n logging-system
-
-# 卸载监控系统
-helm uninstall prometheus grafana jaeger -n monitoring
-
-# 删除命名空间
-kubectl delete namespace logging-system
-kubectl delete namespace monitoring
+cd deploy/k8s/scripts
+./undeploy.sh
 ```
 
 ### 组件搭建说明

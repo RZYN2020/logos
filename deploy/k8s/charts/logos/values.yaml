@@ -1,0 +1,100 @@
+# Logos Platform Configuration
+
+global:
+  logLevel: "info"
+  namespace: "logging-system"
+
+# Log SDK Configuration
+log-sdk:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 128Mi
+
+# Config Server Configuration
+config-server:
+  replicaCount: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 500m
+      memory: 256Mi
+  config:
+    etcdEndpoints: "etcd:2379"
+
+# Log Processor Configuration
+log-processor:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    kafkaBrokers: "kafka:9092"
+    elasticsearchEndpoints: "elasticsearch:9200"
+
+# Log Analyzer Configuration
+log-analyzer:
+  replicaCount: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  config:
+    elasticsearchEndpoints: "elasticsearch:9200"
+
+# Frontend Configuration
+frontend:
+  replicaCount: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 128Mi
+  config:
+    apiEndpoint: "http://log-analyzer:8080"
+
+# Etcd Configuration
+etcd:
+  auth:
+    rbac:
+      create: false
+  replicaCount: 1
+  persistence:
+    size: 10Gi
+
+# Kafka Configuration
+kafka:
+  replicas: 1
+  persistence:
+    size: 50Gi
+
+# Elasticsearch Configuration
+elasticsearch:
+  replicas: 1
+  persistence:
+    size: 100Gi
+
+# PostgreSQL Configuration
+postgresql:
+  primary:
+    persistence:
+      size: 20Gi
+  auth:
+    username: "postgres"
+    password: "postgres"
+    database: "logs"
