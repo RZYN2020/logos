@@ -7,7 +7,14 @@
       "Bash(openspec show:*)",
       "Bash(go test:*)",
       "Bash(openspec instructions specs --change:*)",
-      "Bash(go list:*)"
+      "Bash(go list:*)",
+      "Bash(openspec instructions design:*)",
+      "Bash(openspec instructions:*)",
+      "Bash(chmod:*)",
+      "Bash(helm dependency update:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/eka/Code/logos/openspec/changes/log-processor-etl-enhancement"
     ]
   }
 }
