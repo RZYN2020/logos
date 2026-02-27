@@ -6,30 +6,15 @@ version: 0.1.0
 appVersion: "1.0.0"
 
 dependencies:
-  - name: log-sdk
-    version: 0.1.0
-    repository: file://./log-sdk
-  - name: config-server
-    version: 0.1.0
-    repository: file://./config-server
   - name: log-processor
     version: 0.1.0
     repository: file://./log-processor
+    condition: log-processor.enabled
   - name: log-analyzer
     version: 0.1.0
     repository: file://./log-analyzer
+    condition: log-analyzer.enabled
   - name: frontend
     version: 0.1.0
     repository: file://./frontend
-  - name: etcd
-    version: 8.6.7
-    repository: https://charts.bitnami.com/bitnami
-  - name: kafka
-    version: 22.1.0
-    repository: https://charts.bitnami.com/bitnami
-  - name: elasticsearch
-    version: 19.10.0
-    repository: https://charts.bitnami.com/bitnami
-  - name: postgresql
-    version: 12.6.0
-    repository: https://charts.bitnami.com/bitnami
+    condition: frontend.enabled

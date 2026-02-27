@@ -4,10 +4,13 @@
 
 ## What Changes
 
-- **新增 Kubernetes 部署配置**: 为所有服务创建 Kubernetes Deployment、Service、ConfigMap 等资源
+- **新增 Kubernetes 部署配置**: 为必要服务创建 Kubernetes Deployment、Service、ConfigMap 等资源
+  - 排除 Config Server（功能已合并到 Log Analyzer）
+  - 排除 Log SDK（客户端库，非服务）
+  - 排除 PostgreSQL 和 Jaeger（架构简化时已删除）
 - **完善网络配置**: 配置服务间的通信策略、负载均衡和外部访问
 - **存储配置**: 为 Etcd、Kafka、Elasticsearch 等组件配置持久存储卷
-- **监控和日志收集**: 集成 Prometheus、Grafana、Jaeger 和 Fluentd 的 Kubernetes 配置
+- **监控和日志收集**: 集成 Prometheus、Grafana 和 Fluentd 的 Kubernetes配置（Jaeger 已删除）
 - **CI/CD 相关**: 创建用于部署的 Helm Chart 或 Kustomize 配置
 - **更新文档**: 在 README.md 中详细描述如何在 Kubernetes 上部署和运行整个项目
 

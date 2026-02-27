@@ -1,0 +1,7 @@
+frontend/node_modules/
+frontend/dist/
+log-processor/pkg/
+log-analyzer/pkg/
+log-sdk/log-sdk/
+config-server/pkg/
+*.tgz

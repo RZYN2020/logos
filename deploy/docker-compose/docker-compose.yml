@@ -86,64 +86,6 @@ services:
     networks:
       - logging
 
-  # Flink JobManager
-  flink-jobmanager:
-    image: flink:1.17.1-scala_2.12-java8
-    container_name: flink-jobmanager
-    ports:
-      - "8081:8081"
-    command: jobmanager
-    environment:
-      - |
-        FLINK_PROPERTIES=
-        jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 2
-    depends_on:
-      - kafka-0
-    networks:
-      - logging
-
-  # Flink TaskManager
-  flink-taskmanager:
-    image: flink:1.17.1-scala_2.12-java8
-    container_name: flink-taskmanager
-    depends_on:
-      - flink-jobmanager
-    command: taskmanager
-    environment:
-      - |
-        FLINK_PROPERTIES=
-        jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 2
-    networks:
-      - logging
-
-  # PostgreSQL
-  postgres:
-    image: postgres:14-alpine
-    container_name: postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: logdb
-      POSTGRES_USER: loguser
-      POSTGRES_PASSWORD: logpass
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - logging
-
-  # Redis
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - logging
-
   # Prometheus
   prometheus:
     image: prom/prometheus:v2.45.0
@@ -175,19 +117,6 @@ services:
     networks:
       - logging
 
-  # Jaeger
-  jaeger:
-    image: jaegertracing/all-in-one:1.50
-    container_name: jaeger
-    ports:
-      - "16686:16686"
-      - "14250:14250"
-      - "4317:4317"
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    networks:
-      - logging
-
 networks:
   logging:
     driver: bridge
@@ -196,7 +125,5 @@ volumes:
   etcd0-data:
   kafka0-data:
   es0-data:
-  postgres-data:
-  redis-data:
   prometheus-data:
   grafana-data:

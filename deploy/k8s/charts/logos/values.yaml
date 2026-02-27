@@ -4,32 +4,9 @@ global:
   logLevel: "info"
   namespace: "logging-system"
 
-# Log SDK Configuration
-log-sdk:
-  replicaCount: 3
-  resources:
-    limits:
-      cpu: 500m
-      memory: 256Mi
-    requests:
-      cpu: 250m
-      memory: 128Mi
-
-# Config Server Configuration
-config-server:
-  replicaCount: 2
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 512Mi
-    requests:
-      cpu: 500m
-      memory: 256Mi
-  config:
-    etcdEndpoints: "etcd:2379"
-
 # Log Processor Configuration
 log-processor:
+  enabled: true
   replicaCount: 3
   resources:
     limits:
@@ -44,6 +21,7 @@ log-processor:
 
 # Log Analyzer Configuration
 log-analyzer:
+  enabled: true
   replicaCount: 2
   resources:
     limits:
@@ -52,11 +30,17 @@ log-analyzer:
     requests:
       cpu: 500m
       memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 8080
+    loadBalancerIP: ""
+    externalTrafficPolicy: Cluster
   config:
     elasticsearchEndpoints: "elasticsearch:9200"
 
 # Frontend Configuration
 frontend:
+  enabled: true
   replicaCount: 2
   resources:
     limits:
@@ -65,6 +49,11 @@ frontend:
     requests:
       cpu: 250m
       memory: 128Mi
+  service:
+    type: ClusterIP
+    port: 3000
+    loadBalancerIP: ""
+    externalTrafficPolicy: Cluster
   config:
     apiEndpoint: "http://log-analyzer:8080"
 
@@ -88,13 +77,3 @@ elasticsearch:
   replicas: 1
   persistence:
     size: 100Gi
-
-# PostgreSQL Configuration
-postgresql:
-  primary:
-    persistence:
-      size: 20Gi
-  auth:
-    username: "postgres"
-    password: "postgres"
-    database: "logs"

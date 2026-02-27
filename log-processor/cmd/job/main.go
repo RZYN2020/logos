@@ -151,7 +151,7 @@ func (p *Processor) processMessage(msg kafka.Message) error {
 		"is_error":        enriched.IsError,
 		"error_type":      enriched.ErrorType,
 		"fields":          enriched.Fields,
-		"raw":             enriched.Raw,
+		// raw 字段已删除：节省 40-50% 存储空间
 	}
 
 	// 生成文档ID

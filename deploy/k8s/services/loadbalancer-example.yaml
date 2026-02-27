@@ -1,0 +1,75 @@
+# LoadBalancer Service Examples
+#
+# This file contains example LoadBalancer service configurations
+# for external access to Logos platform services.
+#
+# Apply with: kubectl apply -f loadbalancer-example.yaml
+#
+# Note: LoadBalancer only works in cloud environments or with
+# MetalLB in bare-metal setups.
+
+---
+# Frontend LoadBalancer Service (for UI access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-external
+  namespace: logging-system
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/instance: logos
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/instance: logos
+
+---
+# Log Analyzer LoadBalancer Service (for API access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-analyzer-external
+  namespace: logging-system
+  labels:
+    app.kubernetes.io/name: log-analyzer
+    app.kubernetes.io/instance: logos
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: log-analyzer
+    app.kubernetes.io/instance: logos
+
+---
+# Config Server LoadBalancer Service (optional, for admin access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server-external
+  namespace: logging-system
+  labels:
+    app.kubernetes.io/name: config-server
+    app.kubernetes.io/instance: logos
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: config-server
+    app.kubernetes.io/instance: logos

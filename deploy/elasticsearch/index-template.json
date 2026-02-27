@@ -1,0 +1,29 @@
+{
+  "index_patterns": ["logs*"],
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1,
+    "index.codec": "best_compression",
+    "index.refresh_interval": "30s",
+    "index.mapping.total_fields.limit": 1000
+  },
+  "mappings": {
+    "properties": {
+      "timestamp": { "type": "date" },
+      "level": { "type": "keyword" },
+      "message": { "type": "text", "index_options": "offsets" },
+      "service": { "type": "keyword" },
+      "trace_id": { "type": "keyword" },
+      "span_id": { "type": "keyword" },
+      "http_method": { "type": "keyword" },
+      "http_path": { "type": "keyword" },
+      "http_status": { "type": "integer" },
+      "user_id": { "type": "keyword" },
+      "business_domain": { "type": "keyword" },
+      "tenant_id": { "type": "keyword" },
+      "is_error": { "type": "boolean" },
+      "error_type": { "type": "keyword" },
+      "fields": { "type": "object", "dynamic": true }
+    }
+  }
+}

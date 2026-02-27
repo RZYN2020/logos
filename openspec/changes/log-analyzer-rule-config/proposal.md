@@ -10,14 +10,37 @@
 
 ## What Changes
 
-### 1. 规则配置管理模块
+### 1. Log Analyzer 统一后端
+
+**职责**：
+- **日志查询 API**：提供日志查询接口，支持 SQL 查询
+- **策略配置 API**：提供策略管理接口，读写 Etcd
+- **统一后端**：Frontend 的唯一后端入口
+
+### 2. 前后端协作设计
+
+**架构**：
+```
+Frontend (React)
+    ↓
+Log Analyzer (Go + Gin)
+    ├─→ Elasticsearch (日志查询)
+    └─→ Etcd (策略配置)
+```
+
+**API 契约**：
+- 统一的响应格式
+- RESTful API 设计
+- 版本化 API (`/api/v1`)
+
+### 3. 规则配置管理模块
 - **前端开发**: 使用 React 开发用户友好的规则配置界面
-- **后端开发**: 使用 Go 和 Gin 框架开发规则管理 API
+- **后端开发**: Log Analyzer 提供规则管理 API
 - **ETCD 集成**: 将前端配置通过后端下放到 ETCD，并由 ETCD 分发到 Log Processor 和 Log SDK
 - **配置验证**: 对规则配置进行验证和测试，确保语法正确性和有效性
 - **版本管理**: 支持规则版本控制和回滚功能
 
-### 2. 日志分析模块
+### 4. 日志分析模块
 - **日志挖掘**: 实现日志模式挖掘算法，筛选值得分析的日志
 - **智能推荐**: 根据挖掘结果，推荐相关的规则配置
 - **一键配置**: 将日志挖掘与规则配置结合，实现一键创建规则
@@ -28,6 +51,8 @@
 
 ### New Capabilities
 
+- `unified-backend`: Log Analyzer 统一后端（日志查询 + 配置管理）
+- `frontend-backend-integration`: 前后端协作设计
 - `rule-configuration-ui`: 用户友好的规则配置界面
 - `rule-management-api`: 规则管理和分发的 RESTful API
 - `etcd-distribution`: 规则的 ETCD 存储和分发机制
@@ -52,8 +77,9 @@
 
 ### 包含内容
 
+- Log Analyzer 统一后端 API (Go + Gin)
 - 规则配置前端界面 (React)
-- 规则管理后端 API (Go + Gin)
+- 前后端 API 契约设计
 - ETCD 配置存储和分发机制
 - 日志挖掘和分析算法
 - 智能推荐和自动化配置功能
@@ -68,6 +94,7 @@
 
 ## Success Criteria
 
+- 前后端 API 对接完整，无通信问题
 - 用户可以通过界面完成规则配置，无需直接操作 ETCD
 - 规则配置的分发延迟小于 10 秒
 - 日志挖掘能够识别至少 80% 的异常模式

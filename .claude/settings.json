@@ -11,10 +11,42 @@
       "Bash(openspec instructions design:*)",
       "Bash(openspec instructions:*)",
       "Bash(chmod:*)",
-      "Bash(helm dependency update:*)"
+      "Bash(helm dependency update:*)",
+      "Bash(brew list:*)",
+      "Bash(kubectl version:*)",
+      "Bash(helm version:*)",
+      "Bash(minikube version:*)",
+      "Bash(minikube start:*)",
+      "Bash(sh)",
+      "Bash(podman:*)",
+      "Bash(kind create:*)",
+      "Bash(kubectl cluster-info:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl config use-context:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(helm dependency build:*)",
+      "Bash(ln:*)",
+      "Bash(helm repo update:*)",
+      "Bash(helm search repo:*)",
+      "Bash(helm search:*)",
+      "Bash(helm repo add:*)",
+      "Bash(helm install:*)",
+      "Bash(export:*)",
+      "Bash(ping:*)",
+      "Bash(helm repo list:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(docker build:*)",
+      "Bash(kind load:*)",
+      "Bash(killall:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(helm get:*)",
+      "Bash(kubectl logs:*)"
     ],
     "additionalDirectories": [
-      "/Users/eka/Code/logos/openspec/changes/log-processor-etl-enhancement"
+      "/Users/eka/Code/logos/openspec/changes/log-processor-etl-enhancement",
+      "/Users/eka/.docker",
+      "/Users/eka/Code/logos/deploy/k8s/charts/logos/charts"
     ]
   }
 }

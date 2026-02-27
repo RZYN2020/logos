@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.git/
+.gitignore
+.eslintrc.cjs
+.prettierrc
+README.md
+vite.config.ts
+vitest.config.ts

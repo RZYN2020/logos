@@ -30,6 +30,11 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          command: ["sh", "-c"]
+          args: ["cd /app && go run ./cmd/job/main.go"]
+          volumeMounts:
+            - name: log-processor-source
+              mountPath: /app
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
@@ -43,3 +48,7 @@ spec:
               value: {{ .Values.config.elasticsearchEndpoints }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel }}
+      volumes:
+        - name: log-processor-source
+          hostPath:
+            path: /Users/eka/Code/logos/log-processor
