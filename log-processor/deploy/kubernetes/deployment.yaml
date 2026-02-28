@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-processor
+  namespace: logos
+  labels:
+    app: log-processor
+    component: etl
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: log-processor
+  template:
+    metadata:
+      labels:
+        app: log-processor
+        component: etl
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: log-processor
+      containers:
+      - name: log-processor
+        image: logos-registry/log-processor:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9090
+          name: http
+          protocol: TCP
+        env:
+        - name: KAFKA_BROKERS
+          value: "kafka-0.kafka-headless:9092,kafka-1.kafka-headless:9092,kafka-2.kafka-headless:9092"
+        - name: KAFKA_TOPIC
+          value: "logs"
+        - name: KAFKA_GROUP
+          value: "log-processor"
+        - name: ES_ADDRESSES
+          value: "http://elasticsearch:9200"
+        - name: ES_INDEX
+          value: "logs"
+        - name: BATCH_SIZE
+          value: "100"
+        - name: BATCH_TIMEOUT
+          value: "5s"
+        - name: ETCD_ENDPOINTS
+          value: "etcd-0.etcd-headless:2379,etcd-1.etcd-headless:2379,etcd-2.etcd-headless:2379"
+        - name: ENABLE_FILTERING
+          value: "true"
+        - name: ENABLE_TRANSFORM
+          value: "true"
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: log-processor-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - log-processor
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: log-processor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-processor
+  namespace: logos
+  labels:
+    app: log-processor
+spec:
+  ports:
+  - port: 9090
+    targetPort: 9090
+    name: http
+  selector:
+    app: log-processor
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-processor
+  namespace: logos
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-processor-config
+  namespace: logos
+data:
+  config.yaml: |
+    # Log Processor 配置文件
+    processor:
+      batch_size: 100
+      batch_timeout: 5s
+      max_workers: 10
+      queue_size: 10000
+
+    filtering:
+      enabled: true
+      default_action: allow
+
+    transform:
+      enabled: true
+      max_rules: 100
+
+    metrics:
+      enabled: true
+      port: 9090
+      path: /metrics
+
+    logging:
+      level: info
+      format: json

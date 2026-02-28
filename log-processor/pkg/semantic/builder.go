@@ -5,6 +5,8 @@ package semantic
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -45,8 +47,9 @@ type EnrichedLog struct {
 
 // Builder 语义构建器
 type Builder struct {
-	extractors []FieldExtractor
-	enrichers  []ContextEnricher
+	extractors      []FieldExtractor
+	enrichers       []ContextEnricher
+	autoInferEnabled bool
 }
 
 // FieldExtractor 字段提取器接口
@@ -59,19 +62,38 @@ type ContextEnricher interface {
 	Enrich(ctx context.Context, entry *LogEntry) map[string]interface{}
 }
 
+// BuilderOption 构建器选项
+type BuilderOption func(*Builder)
+
+// WithAutoInfer 启用自动推断
+func WithAutoInfer(enabled bool) BuilderOption {
+	return func(b *Builder) {
+		b.autoInferEnabled = enabled
+	}
+}
+
 // NewBuilder 创建语义构建器
-func NewBuilder() *Builder {
-	return &Builder{
+func NewBuilder(opts ...BuilderOption) *Builder {
+	b := &Builder{
 		extractors: []FieldExtractor{
 			&HTTPExtractor{},
 			&UserExtractor{},
 			&ErrorExtractor{},
+			&TextAnalysisExtractor{},
 		},
 		enrichers: []ContextEnricher{
 			&DomainEnricher{},
 			&TenantEnricher{},
+			&BusinessAttributeEnricher{},
 		},
+		autoInferEnabled: true,
 	}
+
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	return b
 }
 
 // Build 构建语义化日志
@@ -223,6 +245,106 @@ func (e *TenantEnricher) Enrich(ctx context.Context, entry *LogEntry) map[string
 	}
 	if tenantID, ok := entry.Fields["org_id"]; ok {
 		fields["tenant_id"] = tenantID
+	}
+
+	return fields
+}
+
+// TextAnalysisExtractor 文本分析结果提取器
+type TextAnalysisExtractor struct{}
+
+// Extract 从文本分析结果中提取字段
+func (e *TextAnalysisExtractor) Extract(entry *LogEntry) map[string]interface{} {
+	fields := make(map[string]interface{})
+
+	// 从 Fields 中提取分析结果
+	if v, ok := entry.Fields["sentiment_score"]; ok {
+		fields["sentiment_score"] = v
+	}
+	if v, ok := entry.Fields["sentiment_label"]; ok {
+		fields["sentiment_label"] = v
+	}
+	if v, ok := entry.Fields["language"]; ok {
+		fields["language"] = v
+	}
+	if v, ok := entry.Fields["category"]; ok {
+		fields["analysis_category"] = v
+	}
+	if v, ok := entry.Fields["keywords"]; ok {
+		fields["keywords"] = v
+	}
+	if v, ok := entry.Fields["entities"]; ok {
+		fields["entities"] = v
+	}
+
+	// 从消息中提取额外信息
+	e.extractFromMessage(entry.Message, fields)
+
+	return fields
+}
+
+// extractFromMessage 从消息中提取信息
+func (e *TextAnalysisExtractor) extractFromMessage(message string, fields map[string]interface{}) {
+	// 提取 IP 地址
+	ipPattern := regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
+	if ip := ipPattern.FindString(message); ip != "" {
+		fields["detected_ip"] = ip
+	}
+
+	// 提取 URL
+	urlPattern := regexp.MustCompile(`https?://[^\s]+`)
+	if url := urlPattern.FindString(message); url != "" {
+		fields["detected_url"] = url
+	}
+
+	// 提取错误类型
+	errorPattern := regexp.MustCompile(`(?i)(error|exception|failed|failure)[:\s]+([^\n]+)`)
+	if matches := errorPattern.FindStringSubmatch(message); len(matches) > 2 {
+		fields["error_detail"] = strings.TrimSpace(matches[2])
+	}
+}
+
+// BusinessAttributeEnricher 业务属性增强器
+type BusinessAttributeEnricher struct{}
+
+// Enrich 增强业务属性
+func (e *BusinessAttributeEnricher) Enrich(ctx context.Context, entry *LogEntry) map[string]interface{} {
+	fields := make(map[string]interface{})
+
+	// 基于服务名和消息内容推断业务属性
+	service := strings.ToLower(entry.Service)
+	message := strings.ToLower(entry.Message)
+
+	// 推断 API 类型
+	if strings.Contains(service, "api") || strings.Contains(service, "gateway") {
+		fields["api_type"] = "gateway"
+	} else if strings.Contains(service, "internal") {
+		fields["api_type"] = "internal"
+	}
+
+	// 推断请求类型
+	if strings.Contains(message, "get ") {
+		fields["request_type"] = "read"
+	} else if strings.Contains(message, "post ") || strings.Contains(message, "put ") || strings.Contains(message, "create") {
+		fields["request_type"] = "write"
+	}
+
+	// 推断是否为关键业务
+	criticalServices := []string{"payment", "order", "auth", "user"}
+	for _, cs := range criticalServices {
+		if strings.Contains(service, cs) {
+			fields["is_critical"] = true
+			break
+		}
+	}
+
+	// 推断数据敏感性
+	sensitiveKeywords := []string{"password", "token", "secret", "key", "credential", "privacy"}
+	for _, kw := range sensitiveKeywords {
+		if strings.Contains(message, kw) {
+			fields["is_sensitive"] = true
+			break
+		}
 	}
 
 	return fields

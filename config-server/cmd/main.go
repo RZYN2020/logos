@@ -1,56 +1,97 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/log-system/log-processor/config-server/pkg/api"
 )
+
+var (
+	port    string
+	version string
+)
+
+func init() {
+	flag.StringVar(&port, "port", ":8080", "Server port")
+	flag.StringVar(&version, "version", "dev", "Server version")
+	flag.Parse()
+}
 
 func main() {
 	// 创建 API 处理器
-	router := http.NewServeMux()
+	router := api.New()
 
-	// 健康检查
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
-	})
+	// 创建 HTTP 服务器
+	server := &http.Server{
+		Addr:         port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
-	// 就绪检查
-	router.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
-	})
+	// 优雅关闭
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
 
-	// API路由
-	router.HandleFunc("/api/v1/config", func(w http.ResponseWriter, r *http.Request) {
-		config := map[string]interface{}{
-			"version": "1.0.0",
-			"services": []string{
-				"log-processor",
-				"log-analyzer",
-				"log-sdk",
-			},
+		log.Println("Shutting down server...")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			log.Fatalf("Server shutdown error: %v", err)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(config)
-	})
+	}()
 
 	// 启动服务器
-	port := ":8080"
-	log.Printf("Config Server starting on %s", port)
-	fmt.Println(`
-╔─────────────────────────────────────────────╗
-║                                                   ║
-║   🚀  Log System Config Server                    ║
-║                                                   ║
-║   📡 API:        http://localhost:8080/api/v1      ║
-║   💊 Health:      http://localhost:8080/health    ║
-║   📋 System:      http://localhost:8080/info     ║
-║                                                   ║
-╚─────────────────────────────────────────────╝
-`)
+	log.Printf("Config Server starting on %s (version: %s)", port, version)
+	fmt.Printf(`
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   🚀  Log System Config Server                            ║
+║                                                           ║
+║   Version: %s                                          ║
+║   Port: %s                                           ║
+║                                                           ║
+║   API Endpoints:                                          ║
+║   ─────────────────────────────────────────────────────   ║
+║   📋 Parsers:     GET/POST /api/v1/parsers                ║
+║   🔧 Transforms:  GET/POST /api/v1/transforms             ║
+║   🛡️  Filters:     GET/POST /api/v1/filters                ║
+║   📜 Strategies:  GET/POST /api/v1/strategies             ║
+║                                                           ║
+║   Validation:                                             ║
+║   ─────────────────────────────────────────────────────   ║
+║   POST /api/v1/validate/parser                            ║
+║   POST /api/v1/validate/transform                         ║
+║   POST /api/v1/validate/filter                            ║
+║                                                           ║
+║   Watch Changes:                                          ║
+║   ─────────────────────────────────────────────────────   ║
+║   GET  /api/v1/watch?type=parser&id=<id>                  ║
+║                                                           ║
+║   Health & Info:                                          ║
+║   ─────────────────────────────────────────────────────   ║
+║   💊 Health:      GET /health                             ║
+║   📊 Info:        GET /api/v1/info                        ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
 
-	if err := http.ListenAndServe(port, router); err != nil {
+`, version, port)
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
+	log.Println("Server stopped")
 }

@@ -24,6 +24,7 @@ type ParsedLog struct {
 	SpanID    string
 	Fields    map[string]interface{}
 	Raw       string
+	Format    FormatType
 }
 
 // JSONParser JSON 格式解析器
@@ -34,7 +35,7 @@ func NewJSONParser() *JSONParser {
 	return &JSONParser{}
 }
 
-// Parse 解析 JSON 格式日志
+// Parse 解析 JSON 格式日志（容错增强版）
 func (p *JSONParser) Parse(raw []byte) (*ParsedLog, error) {
 	var log map[string]interface{}
 	if err := json.Unmarshal(raw, &log); err != nil {
@@ -46,8 +47,12 @@ func (p *JSONParser) Parse(raw []byte) (*ParsedLog, error) {
 		Raw:    string(raw),
 	}
 
-	// 提取标准字段
+	// 提取标准字段（容错处理）
 	if ts, ok := log["timestamp"]; ok {
+		parsed.Timestamp = parseTimestamp(ts)
+	} else if ts, ok := log["time"]; ok {
+		parsed.Timestamp = parseTimestamp(ts)
+	} else if ts, ok := log["ts"]; ok {
 		parsed.Timestamp = parseTimestamp(ts)
 	} else {
 		parsed.Timestamp = time.Now()
@@ -55,30 +60,48 @@ func (p *JSONParser) Parse(raw []byte) (*ParsedLog, error) {
 
 	if level, ok := log["level"]; ok {
 		parsed.Level = parseString(level)
+	} else if level, ok := log["lvl"]; ok {
+		parsed.Level = parseString(level)
+	} else if level, ok := log["severity"]; ok {
+		parsed.Level = parseString(level)
 	} else {
 		parsed.Level = "INFO"
 	}
 
 	if msg, ok := log["message"]; ok {
 		parsed.Message = parseString(msg)
+	} else if msg, ok := log["msg"]; ok {
+		parsed.Message = parseString(msg)
 	}
 
 	if service, ok := log["service"]; ok {
+		parsed.Service = parseString(service)
+	} else if service, ok := log["svc"]; ok {
+		parsed.Service = parseString(service)
+	} else if service, ok := log["app"]; ok {
 		parsed.Service = parseString(service)
 	}
 
 	if traceID, ok := log["trace_id"]; ok {
 		parsed.TraceID = parseString(traceID)
+	} else if traceID, ok := log["traceID"]; ok {
+		parsed.TraceID = parseString(traceID)
+	} else if traceID, ok := log["trace"]; ok {
+		parsed.TraceID = parseString(traceID)
 	}
 
 	if spanID, ok := log["span_id"]; ok {
+		parsed.SpanID = parseString(spanID)
+	} else if spanID, ok := log["spanID"]; ok {
+		parsed.SpanID = parseString(spanID)
+	} else if spanID, ok := log["span"]; ok {
 		parsed.SpanID = parseString(spanID)
 	}
 
 	// 其余字段放入 Fields
 	for k, v := range log {
 		switch k {
-		case "timestamp", "level", "message", "service", "trace_id", "span_id":
+		case "timestamp", "time", "ts", "level", "lvl", "severity", "message", "msg", "service", "svc", "app", "trace_id", "traceID", "trace", "span_id", "spanID", "span":
 			// 已处理的标准字段
 		default:
 			parsed.Fields[k] = v
