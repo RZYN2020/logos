@@ -1,0 +1,353 @@
+# Log Analyzer Kubernetes 部署配置
+
+## 命名空间
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: log-analyzer
+  labels:
+    name: log-analyzer
+
+---
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-analyzer-config
+  namespace: log-analyzer
+data:
+  PORT: "8080"
+  LOG_LEVEL: "info"
+
+---
+# Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: log-analyzer-secret
+  namespace: log-analyzer
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://loganalyzer:CHANGE_ME_IN_PRODUCTION@postgres:5432/loganalyzer?sslmode=disable"
+  ETCD_ENDPOINTS: "etcd:2379"
+  JWT_SECRET: "CHANGE_THIS_SECRET_KEY_IN_PRODUCTION"
+
+---
+# PostgreSQL PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: log-analyzer
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: log-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "loganalyzer"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: log-analyzer-secret
+              key: db-password
+        - name: POSTGRES_DB
+          value: "loganalyzer"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: log-analyzer
+spec:
+  selector:
+    app: postgres
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  type: ClusterIP
+
+---
+# ETCD PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: etcd-pvc
+  namespace: log-analyzer
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# ETCD Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd
+  namespace: log-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.5.9
+        ports:
+        - containerPort: 2379
+        - containerPort: 2380
+        command:
+        - /usr/local/bin/etcd
+        - --name=etcd0
+        - --advertise-client-urls=http://0.0.0.0:2379
+        - --listen-client-urls=http://0.0.0.0:2379
+        - --data-dir=/etcd-data
+        volumeMounts:
+        - name: etcd-storage
+          mountPath: /etcd-data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: etcd-storage
+        persistentVolumeClaim:
+          claimName: etcd-pvc
+
+---
+# ETCD Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: log-analyzer
+spec:
+  selector:
+    app: etcd
+  ports:
+  - protocol: TCP
+    port: 2379
+    targetPort: 2379
+  type: ClusterIP
+
+---
+# Log Analyzer Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-analyzer
+  namespace: log-analyzer
+  labels:
+    app: log-analyzer
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: log-analyzer
+  template:
+    metadata:
+      labels:
+        app: log-analyzer
+    spec:
+      containers:
+      - name: log-analyzer
+        image: log-analyzer:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: log-analyzer-config
+        - secretRef:
+            name: log-analyzer-secret
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+
+---
+# Log Analyzer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: log-analyzer-service
+  namespace: log-analyzer
+  labels:
+    app: log-analyzer
+spec:
+  type: LoadBalancer
+  selector:
+    app: log-analyzer
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+
+---
+# HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: log-analyzer-hpa
+  namespace: log-analyzer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: log-analyzer
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: log-analyzer-network-policy
+  namespace: log-analyzer
+spec:
+  podSelector:
+    matchLabels:
+      app: log-analyzer
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: etcd
+    ports:
+    - protocol: TCP
+      port: 2379
+
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: log-analyzer-ingress
+  namespace: log-analyzer
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - log-analyzer.example.com
+    secretName: log-analyzer-tls
+  rules:
+  - host: log-analyzer.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: log-analyzer-service
+            port:
+              number: 80

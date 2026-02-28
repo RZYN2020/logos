@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:14-alpine
+    container_name: log-analyzer-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-loganalyzer}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeit_in_production}
+      POSTGRES_DB: loganalyzer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - loganalyzer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-loganalyzer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ETCD 配置存储
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: log-analyzer-etcd
+    command: >
+      /usr/local/bin/etcd
+      --name etcd0
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-client-urls http://0.0.0.0:2379
+      --data-dir /etcd-data
+    volumes:
+      - etcd_data:/etcd-data
+    networks:
+      - loganalyzer-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Log Analyzer 后端服务
+  log-analyzer:
+    build:
+      context: ../../log-analyzer
+      dockerfile: Dockerfile
+    container_name: log-analyzer-api
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://${DB_USER:-loganalyzer}:${DB_PASSWORD:-changeit_in_production}@postgres:5432/loganalyzer?sslmode=disable
+      ETCD_ENDPOINTS: etcd:2379
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      etcd:
+        condition: service_healthy
+    networks:
+      - loganalyzer-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  loganalyzer-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  etcd_data:
+    driver: local

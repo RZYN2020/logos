@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiClient, type Strategy } from "./api/client";
 
-export default function StrategyList() {
+export default function StrategyList({ onEdit }: { onEdit: (id: string) => void }) {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +30,24 @@ export default function StrategyList() {
     }
   };
 
+  const handleEdit = (id: string) => {
+    onEdit(id);
+  };
+
+  const handleHistory = async (id: string) => {
+    try {
+      const history = await apiClient.getStrategyHistory(id);
+      console.log("Strategy history:", history);
+      alert(`策略 ${id} 有 ${history.length} 个历史版本`);
+    } catch (err) {
+      alert("获取历史失败");
+    }
+  };
+
+  const handleCreateNew = () => {
+    onEdit("");
+  };
+
   useEffect(() => {
     loadStrategies();
   }, []);
@@ -47,7 +65,7 @@ export default function StrategyList() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">策略配置管理</h2>
         <button
-          onClick={() => {}}
+          onClick={handleCreateNew}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           ➕ 新建策略
@@ -128,13 +146,13 @@ export default function StrategyList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => {}}
+                      onClick={() => handleEdit(strategy.id)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
                     >
                       编辑
                     </button>
                     <button
-                      onClick={() => {}}
+                      onClick={() => handleHistory(strategy.id)}
                       className="text-green-600 hover:text-green-900 mr-3"
                     >
                       历史

@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { apiClient, type SystemInfo, type HealthCheck } from "./api/client";
+import { apiClient, type SystemInfo, type HealthCheck, type Rule } from "./api/client";
 import StrategyList from "./components/StrategyList";
-import StrategyForm from "./components/StrategyForm";
+import RuleForm from "./components/RuleForm";
 import LogAnalyzer from "./components/LogAnalyzer";
 
-type Tab = "strategies" | "analyzer" | "system";
+type Tab = "rules" | "analyzer" | "system";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("strategies");
-  const [editingStrategy, setEditingStrategy] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("rules");
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [healthStatus, setHealthStatus] = useState<HealthCheck | null>(null);
 
@@ -29,6 +29,11 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleSaveRule = () => {
+    setEditingRuleId(null);
+    setActiveTab("rules");
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* 顶部导航栏 */}
@@ -48,14 +53,14 @@ export default function App() {
 
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => setActiveTab("strategies")}
+                onClick={() => setActiveTab("rules")}
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  activeTab === "strategies"
+                  activeTab === "rules"
                     ? "bg-blue-600 text-white"
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                策略配置
+                规则配置
               </button>
               <button
                 onClick={() => setActiveTab("analyzer")}
@@ -104,7 +109,7 @@ export default function App() {
             </div>
             {systemInfo && (
               <span className="text-gray-500 ml-4">
-                版本: {systemInfo.version} | Etcd: {systemInfo.etcd_version} | 运行时间: {systemInfo.uptime}
+                版本：{systemInfo.version} | Etcd: {systemInfo.etcd_version} | 运行时间：{systemInfo.uptime}
               </span>
             )}
           </div>
@@ -113,16 +118,16 @@ export default function App() {
 
       {/* 主内容区域 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === "strategies" && (
+        {activeTab === "rules" && (
           <div>
-            {editingStrategy ? (
-              <StrategyForm
-                strategy={strategies.find(s => s.id === editingStrategy) || undefined}
-                onSave={() => setEditingStrategy(null)}
-                onCancel={() => setEditingStrategy(null)}
+            {editingRuleId !== null ? (
+              <RuleForm
+                rule={editingRuleId ? null : undefined}
+                onSave={handleSaveRule}
+                onCancel={() => setEditingRuleId(null)}
               />
             ) : (
-              <StrategyList onEdit={setEditingStrategy} />
+              <StrategyList onEdit={setEditingRuleId} />
             )}
           </div>
         )}
@@ -179,10 +184,10 @@ export default function App() {
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         healthStatus.etcd === "connected"
                           ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {healthStatus.etcd === "connected" ? "已连接" : "未连接"}
+                      {healthStatus.etcd === "connected" ? "已连接" : "未检测"}
                     </span>
                   </div>
                 </div>
@@ -198,16 +203,13 @@ export default function App() {
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center text-gray-500 text-sm">
-            语义化日志系统 - 支持动态策略配置的高性能日志系统
+            语义化日志系统 - 支持动态规则配置的高性能日志系统
           </div>
           <div className="text-center text-gray-400 text-xs mt-2">
-            API: http://localhost:8080/api/v1 | Postman: 可导入 docs/postman.json
+            API: http://localhost:8080/api/v1
           </div>
         </div>
       </footer>
     </div>
   );
 }
-
-// Mock strategies data
-const strategies: any[] = [];
