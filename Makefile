@@ -16,43 +16,38 @@ help:
 # 构建
 build:
 	@echo "构建 log-sdk..."
-	@cd log-sdk/log-sdk && go build -o ../../bin/log-sdk ./cmd/logger
-	@echo "构建 log-streaming..."
-	@cd log-streaming && go build -o ../bin/log-streaming ./cmd/job
+	@cd log-sdk/log-sdk && go build -o ../../bin/log-sdk ./...
+	@echo "构建 log-processor..."
+	@cd log-processor && go build -o ../bin/log-processor ./cmd/job
 	@echo "构建 log-analyzer..."
-	@cd log-analyzer && go build -o ../bin/log-analyzer ./cmd/server
-	@echo "构建 config-server..."
-	@cd config-server && go build -o ../bin/config-server ./cmd
+	@cd log-analyzer && go build -o ../bin/log-analyzer ./cmd/main.go
 	@echo "构建完成!"
 
 # 测试
 test:
 	@echo "运行 log-sdk 测试..."
 	@cd log-sdk/log-sdk && go test ./...
-	@echo "运行 log-streaming 测试..."
-	@cd log-streaming && go test ./...
+	@echo "运行 log-processor 测试..."
+	@cd log-processor && go test ./...
 	@echo "运行 log-analyzer 测试..."
 	@cd log-analyzer && go test ./...
-	@echo "运行 config-server 测试..."
-	@cd config-server && go test ./...
+	@echo "测试完成!"
 
 # 清理
 clean:
 	@echo "清理构建产物..."
 	@rm -rf bin/
 	@rm -rf log-sdk/log-sdk/bin
-	@rm -rf log-streaming/bin
+	@rm -rf log-processor/bin
 	@rm -rf log-analyzer/bin
-	@rm -rf config-server/bin
 	@echo "清理完成!"
 
 # 安装依赖
 install:
 	@echo "安装依赖..."
 	@cd log-sdk/log-sdk && go mod download && go mod tidy
-	@cd log-streaming && go mod download && go mod tidy
+	@cd log-processor && go mod download && go mod tidy
 	@cd log-analyzer && go mod download && go mod tidy
-	@cd config-server && go mod download && go mod tidy
 	@echo "依赖安装完成!"
 
 # 基础设施
@@ -64,9 +59,7 @@ deps:
 	@echo "  Etcd:      http://localhost:2379"
 	@echo "  Kibana:    http://localhost:5601"
 	@echo "  Grafana:   http://localhost:3000"
-	@echo "  Flink:     http://localhost:8081"
 	@echo "  Prometheus:http://localhost:9090"
-	@echo "  Jaeger:    http://localhost:16686"
 
 stop-deps:
 	@echo "停止基础设施服务..."
@@ -76,17 +69,13 @@ stop-deps:
 # 部署
 deploy:
 	@echo "部署基础设施到 Kubernetes..."
-	@kubectl create namespace logging || true
-	@kubectl apply -f deploy/k8s/etcd/
-	@kubectl apply -f deploy/k8s/kafka/
-	@kubectl apply -f deploy/k8s/elasticsearch/
-	@kubectl apply -f deploy/k8s/flink/
+	@kubectl create namespace logging-system || true
+	@kubectl apply -f deploy/k8s/storage/
 	@echo "基础设施部署完成!"
 
 deploy-app:
 	@echo "部署应用服务到 Kubernetes..."
-	@kubectl apply -f deploy/k8s/config-server/
-	@kubectl apply -f deploy/k8s/log-analyzer/
+	@kubectl apply -f deploy/k8s/charts/logos/
 	@echo "应用服务部署完成!"
 
 # 文档
