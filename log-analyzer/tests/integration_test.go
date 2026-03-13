@@ -283,18 +283,23 @@ func TestIntegration_LogAnalysis(t *testing.T) {
 
 	// 测试规则推荐
 	t.Run("RecommendRules", func(t *testing.T) {
-		requestJSON := `{
-			"logs": [
-				{"timestamp": "2024-01-01T00:00:00Z", "level": "ERROR", "service": "api", "message": "Payment failed"},
-				{"timestamp": "2024-01-01T00:00:01Z", "level": "ERROR", "service": "api", "message": "Payment failed"},
-				{"timestamp": "2024-01-01T00:00:02Z", "level": "ERROR", "service": "api", "message": "Payment failed"},
-				{"timestamp": "2024-01-01T00:00:03Z", "level": "ERROR", "service": "api", "message": "Payment failed"},
-				{"timestamp": "2024-01-01T00:00:04Z", "level": "ERROR", "service": "api", "message": "Payment failed"}
-			],
-			"min_frequency": 1
-		}`
+		// 生成 51 条日志以触发 medium severity (>50)
+		logs := make([]map[string]interface{}, 51)
+		for i := 0; i < 51; i++ {
+			logs[i] = map[string]interface{}{
+				"timestamp": "2024-01-01T00:00:00Z",
+				"level":     "ERROR",
+				"service":   "api",
+				"message":   "Payment failed",
+			}
+		}
 
-		req, _ := http.NewRequest("POST", "/api/v1/analysis/recommend", bytes.NewBufferString(requestJSON))
+		requestBody, _ := json.Marshal(map[string]interface{}{
+			"logs":          logs,
+			"min_frequency": 1,
+		})
+
+		req, _ := http.NewRequest("POST", "/api/v1/analysis/recommend", bytes.NewBuffer(requestBody))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -306,6 +311,7 @@ func TestIntegration_LogAnalysis(t *testing.T) {
 		var response map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NotNil(t, response["recommendations"])
+		assert.Greater(t, len(response["recommendations"].([]interface{})), 0)
 	})
 }
 
