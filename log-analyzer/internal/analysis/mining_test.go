@@ -116,9 +116,9 @@ func TestClusterLogs(t *testing.T) {
 func TestRecommendRules(t *testing.T) {
 	miner := NewPatternMiner()
 
-	// 创建高频模式
-	entries := make([]LogEntry, 50)
-	for i := 0; i < 50; i++ {
+	// 创建高频模式（超过 50 条以触发 medium severity）
+	entries := make([]LogEntry, 100)
+	for i := 0; i < 100; i++ {
 		entries[i] = LogEntry{
 			Timestamp: time.Now(),
 			Level:     "ERROR",
@@ -171,7 +171,7 @@ func TestExtractKeywords(t *testing.T) {
 		{
 			name:     "with placeholders",
 			pattern:  "Error {num}: connection failed at {timestamp}",
-			expected: "Error : connection failed at ",
+			expected: "Error : connection failed at",
 		},
 		{
 			name:     "without placeholders",
@@ -183,7 +183,7 @@ func TestExtractKeywords(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractKeywords(tt.pattern)
-			assert.Contains(t, result, "Error")
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

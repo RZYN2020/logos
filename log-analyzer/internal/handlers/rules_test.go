@@ -92,7 +92,7 @@ func TestGetRule(t *testing.T) {
 
 	// 创建测试数据
 	rule := &models.Rule{
-		ID:          "test-001",
+		ID:          "test-get-001",
 		Name:        "test-rule",
 		Description: "test description",
 		Enabled:     true,
@@ -101,7 +101,7 @@ func TestGetRule(t *testing.T) {
 	}
 	db.Create(rule)
 
-	req, _ := http.NewRequest("GET", "/rules/test-001", nil)
+	req, _ := http.NewRequest("GET", "/rules/test-get-001", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -109,7 +109,7 @@ func TestGetRule(t *testing.T) {
 
 	var response models.Rule
 	_ = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.Equal(t, "test-001", response.ID)
+	assert.Equal(t, "test-get-001", response.ID)
 	assert.Equal(t, "test-rule", response.Name)
 }
 
@@ -120,8 +120,8 @@ func TestListRules(t *testing.T) {
 
 	// 创建测试数据
 	rules := []models.Rule{
-		{ID: "test-001", Name: "rule-1", Version: 1},
-		{ID: "test-002", Name: "rule-2", Version: 1},
+		{ID: "test-list-001", Name: "rule-1", Version: 1},
+		{ID: "test-list-002", Name: "rule-2", Version: 1},
 	}
 	for i := range rules {
 		db.Create(&rules[i])
@@ -145,7 +145,7 @@ func TestUpdateRule(t *testing.T) {
 
 	// 创建测试数据
 	rule := &models.Rule{
-		ID:          "test-001",
+		ID:          "test-update-001",
 		Name:        "test-rule",
 		Description: "original description",
 		Enabled:     true,
@@ -163,7 +163,7 @@ func TestUpdateRule(t *testing.T) {
 		"actions": []
 	}`
 
-	req, _ := http.NewRequest("PUT", "/rules/test-001", bytes.NewBufferString(updateJSON))
+	req, _ := http.NewRequest("PUT", "/rules/test-update-001", bytes.NewBufferString(updateJSON))
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
@@ -173,7 +173,7 @@ func TestUpdateRule(t *testing.T) {
 
 	// 验证数据库中的数据已更新
 	var updatedRule models.Rule
-	db.First(&updatedRule, "id = ?", "test-001")
+	db.First(&updatedRule, "id = ?", "test-update-001")
 	assert.Equal(t, "updated-rule", updatedRule.Name)
 	assert.Equal(t, "updated description", updatedRule.Description)
 	assert.Equal(t, false, updatedRule.Enabled)
@@ -188,12 +188,12 @@ func TestDeleteRule(t *testing.T) {
 
 	// 创建测试数据
 	rule := &models.Rule{
-		ID:   "test-001",
+		ID:   "test-delete-001",
 		Name: "test-rule",
 	}
 	db.Create(rule)
 
-	req, _ := http.NewRequest("DELETE", "/rules/test-001", nil)
+	req, _ := http.NewRequest("DELETE", "/rules/test-delete-001", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -201,7 +201,7 @@ func TestDeleteRule(t *testing.T) {
 
 	// 验证数据库中的数据已删除
 	var deletedRule models.Rule
-	result := db.First(&deletedRule, "id = ?", "test-001")
+	result := db.First(&deletedRule, "id = ?", "test-delete-001")
 	assert.Error(t, result.Error)
 	assert.Equal(t, "record not found", result.Error.Error())
 }
@@ -213,22 +213,22 @@ func TestValidateRule(t *testing.T) {
 
 	// 创建有效的测试数据
 	rule := &models.Rule{
-		ID:       "test-001",
+		ID:       "test-validate-001",
 		Name:     "test-rule",
 		Enabled:  true,
 		Version:  1,
 		Conditions: []models.Condition{
-			{ID: "cond-001", RuleID: "test-001", Field: "level", Operator: "=", Value: "ERROR"},
+			{ID: "cond-validate-001", RuleID: "test-validate-001", Field: "level", Operator: "=", Value: "ERROR"},
 		},
 		Actions: []models.Action{
-			{ID: "act-001", RuleID: "test-001", Type: "filter", Config: map[string]interface{}{"sampling": 1.0}},
+			{ID: "act-validate-001", RuleID: "test-validate-001", Type: "filter", Config: models.JSONMap{"sampling": 1.0}},
 		},
 	}
 	db.Create(rule)
 	db.Create(&rule.Conditions[0])
 	db.Create(&rule.Actions[0])
 
-	req, _ := http.NewRequest("POST", "/rules/test-001/validate", nil)
+	req, _ := http.NewRequest("POST", "/rules/test-validate-001/validate", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -246,18 +246,18 @@ func TestTestRule(t *testing.T) {
 
 	// 创建测试数据
 	rule := &models.Rule{
-		ID:       "test-001",
+		ID:       "test-rule-001",
 		Name:     "test-rule",
 		Enabled:  true,
 		Version:  1,
 		Conditions: []models.Condition{
-			{ID: "cond-001", RuleID: "test-001", Field: "level", Operator: "=", Value: "ERROR"},
+			{ID: "cond-test-001", RuleID: "test-rule-001", Field: "level", Operator: "=", Value: "ERROR"},
 		},
 	}
 	db.Create(rule)
 	db.Create(&rule.Conditions[0])
 
-	req, _ := http.NewRequest("POST", "/rules/test-001/test", nil)
+	req, _ := http.NewRequest("POST", "/rules/test-rule-001/test", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

@@ -2,11 +2,37 @@
 package models
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 	unifiedRule "github.com/log-system/logos/pkg/rule"
 )
+
+// JSONMap 自定义类型，用于在 SQLite 中存储 JSON 数据
+type JSONMap map[string]interface{}
+
+// Value 实现 driver.Valuer 接口
+func (m JSONMap) Value() (driver.Value, error) {
+	if m == nil {
+		return nil, nil
+	}
+	return json.Marshal(m)
+}
+
+// Scan 实现 sql.Scanner 接口
+func (m *JSONMap) Scan(value interface{}) error {
+	if value == nil {
+		*m = nil
+		return nil
+	}
+	data, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(data, m)
+}
 
 // Rule 规则配置模型
 type Rule struct {
@@ -28,26 +54,26 @@ type Condition struct {
 	RuleID   string      `json:"rule_id" gorm:"index"`
 	Field    string      `json:"field"`
 	Operator string      `json:"operator"`
-	Value    interface{} `json:"value" gorm:"type:jsonb"`
+	Value    interface{} `json:"value" gorm:"type:text"`
 }
 
 // Action 规则动作
 type Action struct {
-	ID     string                 `json:"id" gorm:"primaryKey"`
-	RuleID string                 `json:"rule_id" gorm:"index"`
-	Type   string                 `json:"type"` // filter/drop/transform
-	Config map[string]interface{} `json:"config,omitempty" gorm:"type:jsonb"`
+	ID     string   `json:"id" gorm:"primaryKey"`
+	RuleID string   `json:"rule_id" gorm:"index"`
+	Type   string   `json:"type"` // filter/drop/transform
+	Config JSONMap  `json:"config,omitempty" gorm:"type:text"`
 }
 
 // RuleVersion 规则版本历史
 type RuleVersion struct {
-	ID        string                 `json:"id" gorm:"primaryKey"`
-	RuleID    string                 `json:"rule_id" gorm:"index"`
-	Version   int                    `json:"version"`
-	Content   map[string]interface{} `json:"content" gorm:"type:jsonb"`
-	Author    string                 `json:"author"`
-	Comment   string                 `json:"comment,omitempty"`
-	CreatedAt time.Time              `json:"created_at"`
+	ID        string    `json:"id" gorm:"primaryKey"`
+	RuleID    string    `json:"rule_id" gorm:"index"`
+	Version   int       `json:"version"`
+	Content   JSONMap   `json:"content" gorm:"type:text"`
+	Author    string    `json:"author"`
+	Comment   string    `json:"comment,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Strategy 策略模型 (用于策略组管理)
@@ -65,10 +91,10 @@ type Strategy struct {
 
 // StrategyRule 策略规则
 type StrategyRule struct {
-	ID        string                 `json:"id" gorm:"primaryKey"`
-	StrategyID string                `json:"strategy_id" gorm:"index"`
-	Condition map[string]interface{} `json:"condition" gorm:"type:jsonb"`
-	Action    map[string]interface{} `json:"action" gorm:"type:jsonb"`
+	ID        string    `json:"id" gorm:"primaryKey"`
+	StrategyID string   `json:"strategy_id" gorm:"index"`
+	Condition JSONMap   `json:"condition" gorm:"type:text"`
+	Action    JSONMap   `json:"action" gorm:"type:text"`
 }
 
 // LogPattern 日志模式 (用于日志挖掘结果)
@@ -78,7 +104,7 @@ type LogPattern struct {
 	Description string    `json:"description,omitempty"`
 	Frequency   int       `json:"frequency"`
 	Severity    string    `json:"severity"` // high/medium/low
-	Examples    []string  `json:"examples" gorm:"type:jsonb"`
+	Examples    []string  `json:"examples" gorm:"type:text"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -88,7 +114,7 @@ type LogCluster struct {
 	Center     string    `json:"center"`
 	Size       int       `json:"size"`
 	Similarity float64   `json:"similarity"`
-	Members    []string  `json:"members" gorm:"type:jsonb"`
+	Members    []string  `json:"members" gorm:"type:text"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -119,7 +145,7 @@ func (r *Rule) ToUnifiedRule() *unifiedRule.Rule {
 	for _, act := range r.Actions {
 		actions = append(actions, unifiedRule.ActionDef{
 			Type:   act.Type,
-			Config: act.Config,
+			Config: map[string]interface{}(act.Config),
 		})
 	}
 
@@ -169,7 +195,7 @@ func (r *Rule) FromUnifiedRule(ur *unifiedRule.Rule) {
 			ID:     uuid.New().String(),
 			RuleID: ur.ID,
 			Type:   act.Type,
-			Config: act.Config,
+			Config: JSONMap(act.Config),
 		})
 	}
 }

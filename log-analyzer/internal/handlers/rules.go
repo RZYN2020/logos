@@ -220,8 +220,11 @@ func (h *RuleHandler) DeleteRule(c *gin.Context) {
 	}
 
 	// 从 ETCD 删除 - 使用统一规则的命名空间
-	key := "/rules/clients/analyzer.default/sdk/" + ruleID
-	_ = h.etcdCli.Delete(c.Request.Context(), key)
+	// 测试模式下 etcdCli 可能为 nil
+	if h.etcdCli != nil {
+		key := "/rules/clients/analyzer.default/sdk/" + ruleID
+		_ = h.etcdCli.Delete(c.Request.Context(), key)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "rule deleted"})
 }
@@ -391,6 +394,11 @@ func (h *RuleHandler) ImportRules(c *gin.Context) {
 
 // syncRuleToEtcd 同步规则到 ETCD
 func (h *RuleHandler) syncRuleToEtcd(rule *models.Rule) error {
+	// 测试模式下 etcdCli 可能为 nil
+	if h.etcdCli == nil {
+		return nil
+	}
+
 	ctx := context.Background()
 
 	// 转换为统一规则模型
