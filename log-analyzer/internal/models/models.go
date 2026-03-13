@@ -3,6 +3,9 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
+	unifiedRule "github.com/log-system/logos/pkg/rule"
 )
 
 // Rule 规则配置模型
@@ -87,4 +90,109 @@ type LogCluster struct {
 	Similarity float64   `json:"similarity"`
 	Members    []string  `json:"members" gorm:"type:jsonb"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+// ToUnifiedRule 将数据库规则转换为统一规则模型
+func (r *Rule) ToUnifiedRule() *unifiedRule.Rule {
+	// 构建复合条件
+	var conditions []unifiedRule.Condition
+	for _, cond := range r.Conditions {
+		conditions = append(conditions, unifiedRule.Condition{
+			Field:    cond.Field,
+			Operator: cond.Operator,
+			Value:    cond.Value,
+		})
+	}
+
+	// 构建复合条件（使用 all 连接所有条件）
+	var compositeCondition unifiedRule.Condition
+	if len(conditions) == 1 {
+		compositeCondition = conditions[0]
+	} else if len(conditions) > 1 {
+		compositeCondition = unifiedRule.Condition{
+			All: conditions,
+		}
+	}
+
+	// 构建动作
+	var actions []unifiedRule.ActionDef
+	for _, act := range r.Actions {
+		actions = append(actions, unifiedRule.ActionDef{
+			Type:   act.Type,
+			Config: act.Config,
+		})
+	}
+
+	return &unifiedRule.Rule{
+		ID:          r.ID,
+		Name:        r.Name,
+		Description: r.Description,
+		Enabled:     r.Enabled,
+		Condition:   compositeCondition,
+		Actions:     actions,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+	}
+}
+
+// FromUnifiedRule 从统一规则模型转换为数据库规则
+func (r *Rule) FromUnifiedRule(ur *unifiedRule.Rule) {
+	r.ID = ur.ID
+	r.Name = ur.Name
+	r.Description = ur.Description
+	r.Enabled = ur.Enabled
+	r.Version++
+	r.UpdatedAt = time.Now()
+
+	// 清空旧的条件和动作
+	r.Conditions = nil
+	r.Actions = nil
+
+	// 展平复合条件为简单条件列表
+	var flatConditions []unifiedRule.Condition
+	flattenCondition(ur.Condition, &flatConditions)
+
+	// 转换为数据库条件
+	for _, cond := range flatConditions {
+		r.Conditions = append(r.Conditions, Condition{
+			ID:       uuid.New().String(),
+			RuleID:   ur.ID,
+			Field:    cond.Field,
+			Operator: cond.Operator,
+			Value:    cond.Value,
+		})
+	}
+
+	// 转换为数据库动作
+	for _, act := range ur.Actions {
+		r.Actions = append(r.Actions, Action{
+			ID:     uuid.New().String(),
+			RuleID: ur.ID,
+			Type:   act.Type,
+			Config: act.Config,
+		})
+	}
+}
+
+// flattenCondition 递归展平复合条件
+func flattenCondition(cond unifiedRule.Condition, result *[]unifiedRule.Condition) {
+	if cond.IsSingle() {
+		*result = append(*result, cond)
+		return
+	}
+
+	// 处理 all 条件
+	for _, child := range cond.All {
+		flattenCondition(child, result)
+	}
+
+	// 处理 any 条件（转换为多个规则或使用标记）
+	for _, child := range cond.Any {
+		flattenCondition(child, result)
+	}
+
+	// 处理 not 条件
+	if cond.Not != nil {
+		flattenCondition(*cond.Not, result)
+	}
 }

@@ -2025,15 +2025,3 @@ BenchmarkLoggerInfoWithFields-16  8000000   145 ns/op    0 B/op   0 allocs/op
 [9] OpenTelemetry Community. OpenTelemetry Specification[EB/OL]. https://opentelemetry.io/, 2024.
 
 [10] Elasticsearch: The Definitive Guide[M]. O'Reilly Media, 2015.
-
----
-
-## 致谢
-
-感谢我的导师 [导师姓名] 教授在论文撰写过程中给予的悉心指导和无私帮助。从论文选题、研究设计、实验实施到论文定稿，每个环节都离不开导师的耐心指导。
-
-感谢实验室的同学们，在项目开发过程中给予的帮助和支持，大家的讨论和建议让我受益匪浅。
-
-感谢我的家人，在我求学期间给予的理解和鼓励，是你们的支持让我能够专心完成研究工作。
-
-最后，感谢所有在我成长道路上给予帮助的人们。

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/log-system/log-sdk/pkg/async"
-	"github.com/log-system/log-sdk/pkg/strategy"
+	"github.com/log-system/log-sdk/pkg/rule"
 )
 
 // Hook 是日志钩子接口，在实际打印日志前被调用
@@ -210,7 +210,7 @@ type Config struct {
 type loggerImpl struct {
 	config   Config
 	producer *async.Producer
-	strategy *strategy.Engine
+	rule     *rule.Engine
 	fields   []Field
 	hooks    []Hook
 	mu       sync.RWMutex
@@ -232,21 +232,21 @@ func New(cfg Config) Logger {
 	// 创建异步生产者
 	producer := async.NewProducer(cfg.KafkaBrokers, cfg.BatchSize, cfg.BatchTimeout)
 
-	// 创建策略引擎（如果配置了etcd）
-	var engine *strategy.Engine
+	// 创建规则引擎（如果配置了etcd）
+	var engine *rule.Engine
 	if len(cfg.EtcdEndpoints) > 0 {
 		var err error
-		engine, err = strategy.NewEngine(cfg.EtcdEndpoints)
+		engine, err = rule.NewEngine(rule.Config{ServiceName: cfg.ServiceName, Environment: cfg.Environment, EtcdEndpoints: cfg.EtcdEndpoints})
 		if err != nil {
-			// 策略引擎失败不影响日志记录
-			println("Failed to create strategy engine:", err.Error())
+			// 规则引擎失败不影响日志记录
+			println("Failed to create rule engine:", err.Error())
 		}
 	}
 
 	return &loggerImpl{
 		config:   cfg,
 		producer: producer,
-		strategy: engine,
+		rule: engine,
 		fields:   make([]Field, 0),
 		hooks:    make([]Hook, 0),
 	}
@@ -345,8 +345,8 @@ func (l *loggerImpl) logEntry(entry LogEntry) {
 		}
 	}
 
-	if l.strategy != nil {
-		decision := l.strategy.Evaluate(entry.Level, l.config.ServiceName, l.config.Environment, entry.Fields)
+	if l.rule != nil {
+		decision := l.rule.Evaluate(entry.Level, l.config.ServiceName, l.config.Environment, entry.Fields)
 		if !decision.ShouldLog {
 			return
 		}
@@ -408,7 +408,7 @@ func (l *loggerImpl) With(fields ...Field) Logger {
 	newLogger := &loggerImpl{
 		config:   l.config,
 		producer: l.producer,
-		strategy: l.strategy,
+		rule: l.rule,
 		fields:   append(l.fields, fields...),
 		hooks:    append([]Hook(nil), l.hooks...),
 	}
@@ -419,7 +419,7 @@ func (l *loggerImpl) AddHook(h Hook) Logger {
 	newLogger := &loggerImpl{
 		config:   l.config,
 		producer: l.producer,
-		strategy: l.strategy,
+		rule: l.rule,
 		fields:   append([]Field(nil), l.fields...),
 		hooks:    append(append([]Hook(nil), l.hooks...), h),
 	}
@@ -440,9 +440,9 @@ func (l *loggerImpl) Close() error {
 
 	l.closed = true
 
-	// 关闭策略引擎
-	if l.strategy != nil {
-		l.strategy.Close()
+	// 关闭规则引擎
+	if l.rule != nil {
+		l.rule.Close()
 	}
 
 	// 关闭生产者
@@ -496,9 +496,9 @@ func (l *loggerImpl) log(level Level, msg string, fields ...Field) {
 		}
 	}
 
-	// 策略评估
-	if l.strategy != nil {
-		decision := l.strategy.Evaluate(level.String(), l.config.ServiceName, l.config.Environment, allFields)
+	// 规则评估
+	if l.rule != nil {
+		decision := l.rule.Evaluate(level.String(), l.config.ServiceName, l.config.Environment, allFields)
 		if !decision.ShouldLog {
 			return // 被策略过滤
 		}

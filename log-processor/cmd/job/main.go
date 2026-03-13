@@ -15,6 +15,7 @@ import (
 	"github.com/log-system/log-processor/pkg/analyzer"
 	"github.com/log-system/log-processor/pkg/config"
 	"github.com/log-system/log-processor/pkg/filter"
+	processorRule "github.com/log-system/log-processor/pkg/rule"
 	"github.com/log-system/log-processor/pkg/parser"
 	"github.com/log-system/log-processor/pkg/semantic"
 	"github.com/log-system/log-processor/pkg/sink"
@@ -41,7 +42,8 @@ type Processor struct {
 	config       Config
 	reader       *kafka.Reader
 	parser       *parser.ExtendedMultiParser
-	filterEngine *filter.FilterEngineImpl
+	filterEngine filter.FilterEngine
+	ruleEngine   *processorRule.Engine
 	analyzer     *analyzer.TextAnalyzerImpl
 	transformer  *transformer.TransformerImpl
 	builder      *semantic.Builder
@@ -65,9 +67,6 @@ func NewProcessor(cfg Config) (*Processor, error) {
 	// 创建扩展解析器
 	p := parser.NewExtendedMultiParser()
 
-	// 创建过滤器引擎
-	filterEngine := filter.NewFilterEngine()
-
 	// 创建文本分析器
 	textAnalyzer := analyzer.NewTextAnalyzer()
 
@@ -77,23 +76,28 @@ func NewProcessor(cfg Config) (*Processor, error) {
 	// 创建语义构建器
 	builder := semantic.NewBuilder()
 
-	// 创建配置管理器（如果启用了 ETCD）
-	var configMgr config.ConfigManager
+	// 创建规则引擎（如果配置了 ETCD）
+	var ruleEngine *processorRule.Engine
+	var filterEngine filter.FilterEngine
+
 	if cfg.EnableFiltering && len(cfg.EtcdEndpoints) > 0 {
-		mgrCfg := config.ConfigManagerConfig{
-			EtcdEndpoints:   cfg.EtcdEndpoints,
-			RefreshInterval: 30 * time.Second,
-		}
 		var err error
-		configMgr, err = config.NewEtcdConfigManager(mgrCfg)
+		ruleEngine, err = processorRule.NewEngine(processorRule.Config{
+			ServiceName:   "log-processor",
+			Environment:   getEnvString("ENVIRONMENT", "dev"),
+			EtcdEndpoints: cfg.EtcdEndpoints,
+		})
 		if err != nil {
-			log.Printf("Warning: failed to create config manager: %v", err)
+			log.Printf("Warning: failed to create rule engine: %v", err)
 		} else {
-			// 加载过滤配置
-			if err := filterEngine.LoadFilters(configMgr); err != nil {
-				log.Printf("Warning: failed to load filters: %v", err)
-			}
+			// 使用新的规则引擎过滤器
+			filterEngine = filter.NewRuleFilterEngine(ruleEngine)
 		}
+	}
+
+	// 如果没有启用过滤或者规则引擎创建失败，使用空过滤器
+	if filterEngine == nil {
+		filterEngine = &filter.LegacyFilterEngine{}
 	}
 
 	// 创建 Sink
@@ -107,11 +111,11 @@ func NewProcessor(cfg Config) (*Processor, error) {
 		reader:       reader,
 		parser:       p,
 		filterEngine: filterEngine,
+		ruleEngine:   ruleEngine,
 		analyzer:     textAnalyzer,
 		transformer:  transformer,
 		builder:      builder,
 		sink:         s,
-		configMgr:    configMgr,
 		batch:        make([]sink.LogEntry, 0, cfg.BatchSize),
 		lastFlush:    time.Now(),
 	}, nil
@@ -304,9 +308,17 @@ func (p *Processor) Close() error {
 		return fmt.Errorf("error closing sink: %w", err)
 	}
 
-	if p.configMgr != nil {
-		if err := p.configMgr.Close(); err != nil {
-			log.Printf("Error closing config manager: %v", err)
+	// 关闭规则引擎
+	if p.ruleEngine != nil {
+		if err := p.ruleEngine.Close(); err != nil {
+			log.Printf("Error closing rule engine: %v", err)
+		}
+	}
+
+	// 关闭过滤器
+	if p.filterEngine != nil {
+		if err := p.filterEngine.Close(); err != nil {
+			log.Printf("Error closing filter engine: %v", err)
 		}
 	}
 

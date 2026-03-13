@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { apiClient, type Strategy } from "./api/client";
+import { apiClient, type Rule } from "./api/client";
 
-export default function StrategyList({ onEdit }: { onEdit: (id: string) => void }) {
-  const [strategies, setStrategies] = useState<Strategy[]>([]);
+export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
+  const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadStrategies = async () => {
+  const loadRules = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.listStrategies();
-      setStrategies(data);
+      const data = await apiClient.listRules();
+      setRules(data);
     } catch (err) {
-      setError("加载策略失败");
+      setError("加载规则失败");
       console.error(err);
     } finally {
       setLoading(false);
@@ -21,10 +21,10 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定删除此策略？")) return;
+    if (!confirm("确定删除此规则？")) return;
     try {
-      await apiClient.deleteStrategy(id);
-      await loadStrategies();
+      await apiClient.deleteRule(id);
+      await loadRules();
     } catch (err) {
       alert("删除失败");
     }
@@ -34,22 +34,12 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
     onEdit(id);
   };
 
-  const handleHistory = async (id: string) => {
-    try {
-      const history = await apiClient.getStrategyHistory(id);
-      console.log("Strategy history:", history);
-      alert(`策略 ${id} 有 ${history.length} 个历史版本`);
-    } catch (err) {
-      alert("获取历史失败");
-    }
-  };
-
   const handleCreateNew = () => {
     onEdit("");
   };
 
   useEffect(() => {
-    loadStrategies();
+    loadRules();
   }, []);
 
   if (loading) {
@@ -63,12 +53,12 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
   return (
     <div className="px-4 py-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">策略配置管理</h2>
+        <h2 className="text-2xl font-bold">规则配置管理</h2>
         <button
           onClick={handleCreateNew}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          ➕ 新建策略
+          ➕ 新建规则
         </button>
       </div>
 
@@ -89,13 +79,13 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
                 描述
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                版本
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 状态
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                更新时间
+                条件
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                动作
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 操作
@@ -103,62 +93,58 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {strategies.length === 0 ? (
+            {rules.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                  暂无策略，点击「新建策略」创建
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  暂无规则，点击「新建规则」创建
                 </td>
               </tr>
             ) : (
-              strategies.map((strategy) => (
-                <tr key={strategy.id} className="hover:bg-gray-50">
+              rules.map((rule) => (
+                <tr key={rule.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {strategy.name}
+                      {rule.name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {strategy.id}
+                      {rule.id}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">
-                      {strategy.description}
+                    <div className="text-sm text-gray-900 max-w-xs truncate">
+                      {rule.description || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {strategy.version}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {strategy.enabled ? (
+                    {rule.enabled ? (
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        ✅ 启用
+                        启用
                       </span>
                     ) : (
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                        ⏸️ 禁用
+                        禁用
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(strategy.updated_at).toLocaleString("zh-CN")}
+                  <td className="px-6 py-4">
+                    <div className="text-xs text-gray-500 max-w-xs truncate">
+                      {getConditionSummary(rule.condition)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-xs text-gray-500">
+                      {rule.actions.map(a => a.type).join(', ')}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => handleEdit(strategy.id)}
+                      onClick={() => handleEdit(rule.id)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
                     >
                       编辑
                     </button>
                     <button
-                      onClick={() => handleHistory(strategy.id)}
-                      className="text-green-600 hover:text-green-900 mr-3"
-                    >
-                      历史
-                    </button>
-                    <button
-                      onClick={() => handleDelete(strategy.id)}
+                      onClick={() => handleDelete(rule.id)}
                       className="text-red-600 hover:text-red-900"
                     >
                       删除
@@ -172,4 +158,21 @@ export default function StrategyList({ onEdit }: { onEdit: (id: string) => void 
       </div>
     </div>
   );
+}
+
+// 获取条件摘要
+function getConditionSummary(condition: import("./api/client").Condition): string {
+  if (condition.all) {
+    return `AND (${condition.all.length} 条件)`;
+  }
+  if (condition.any) {
+    return `OR (${condition.any.length} 条件)`;
+  }
+  if (condition.not) {
+    return `NOT (${condition.not.field || 'complex'})`;
+  }
+  if (condition.field && condition.operator) {
+    return `${condition.field} ${condition.operator} ${JSON.stringify(condition.value)}`;
+  }
+  return '复杂条件';
 }

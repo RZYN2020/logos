@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiClient, type SystemInfo, type HealthCheck, type Rule } from "./api/client";
-import StrategyList from "./components/StrategyList";
+import RuleList from "./components/RuleList";
 import RuleForm from "./components/RuleForm";
 import LogAnalyzer from "./components/LogAnalyzer";
 
@@ -127,7 +127,7 @@ export default function App() {
                 onCancel={() => setEditingRuleId(null)}
               />
             ) : (
-              <StrategyList onEdit={setEditingRuleId} />
+              <RuleList onEdit={setEditingRuleId} />
             )}
           </div>
         )}

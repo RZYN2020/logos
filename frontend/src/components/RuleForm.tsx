@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiClient, type Rule, type Condition, type Action } from "./api/client";
+import { apiClient, type Rule, type Condition, type Action, type ActionType, type ConditionOperator } from "./api/client";
 
 interface Props {
   rule?: Rule;
@@ -7,16 +7,56 @@ interface Props {
   onCancel: () => void;
 }
 
+// 操作符选项
+const OPERATOR_OPTIONS: { value: ConditionOperator; label: string }[] = [
+  { value: 'eq', label: '等于 (eq)' },
+  { value: 'ne', label: '不等于 (ne)' },
+  { value: 'gt', label: '大于 (gt)' },
+  { value: 'lt', label: '小于 (lt)' },
+  { value: 'ge', label: '大于等于 (ge)' },
+  { value: 'le', label: '小于等于 (le)' },
+  { value: 'contains', label: '包含 (contains)' },
+  { value: 'starts_with', label: '开始于 (starts_with)' },
+  { value: 'ends_with', label: '结束于 (ends_with)' },
+  { value: 'matches', label: '正则匹配 (matches)' },
+  { value: 'in', label: '在集合中 (in)' },
+  { value: 'not_in', label: '不在集合中 (not_in)' },
+  { value: 'exists', label: '字段存在 (exists)' },
+  { value: 'not_exists', label: '字段不存在 (not_exists)' },
+];
+
+// 动作类型选项
+const ACTION_TYPE_OPTIONS: { value: ActionType; label: string }[] = [
+  { value: 'keep', label: '保留并终止 (keep)' },
+  { value: 'drop', label: '丢弃并终止 (drop)' },
+  { value: 'sample', label: '采样 (sample)' },
+  { value: 'mask', label: '掩码敏感数据 (mask)' },
+  { value: 'truncate', label: '截断字段 (truncate)' },
+  { value: 'extract', label: '提取子串 (extract)' },
+  { value: 'rename', label: '重命名字段 (rename)' },
+  { value: 'remove', label: '删除字段 (remove)' },
+  { value: 'set', label: '设置字段值 (set)' },
+  { value: 'mark', label: '添加标记 (mark)' },
+];
+
+// 条件类型
+type ConditionType = 'single' | 'all' | 'any' | 'not';
+
 export default function RuleForm({ rule, onSave, onCancel }: Props) {
   const [name, setName] = useState(rule?.name || "");
   const [description, setDescription] = useState(rule?.description || "");
   const [enabled, setEnabled] = useState(rule?.enabled ?? true);
-  const [priority, setPriority] = useState(rule?.priority ?? 0);
-  const [conditionsJson, setConditionsJson] = useState<string>(
-    rule?.conditions ? JSON.stringify(rule.conditions, null, 2) : "[{\"field\": \"level\", \"operator\": \"=\", \"value\": \"ERROR\"}]"
+  const [conditionJson, setConditionJson] = useState<string>(
+    rule?.condition ? JSON.stringify(rule.condition, null, 2) : JSON.stringify({
+      field: "level",
+      operator: "eq",
+      value: "ERROR"
+    }, null, 2)
   );
   const [actionsJson, setActionsJson] = useState<string>(
-    rule?.actions ? JSON.stringify(rule.actions, null, 2) : "[{\"type\": \"filter\", \"config\": {\"sampling\": 1.0}}]"
+    rule?.actions ? JSON.stringify(rule.actions, null, 2) : JSON.stringify([{
+      type: "drop"
+    }], null, 2)
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -33,11 +73,11 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
     try {
       setSaving(true);
 
-      let parsedConditions: Condition[];
+      let parsedCondition: Condition;
       try {
-        parsedConditions = JSON.parse(conditionsJson);
-      } catch {
-        setError("条件 JSON 格式错误");
+        parsedCondition = JSON.parse(conditionJson);
+      } catch (err) {
+        setError("条件 JSON 格式错误：" + (err as Error).message);
         setSaving(false);
         return;
       }
@@ -45,8 +85,8 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
       let parsedActions: Action[];
       try {
         parsedActions = JSON.parse(actionsJson);
-      } catch {
-        setError("动作 JSON 格式错误");
+      } catch (err) {
+        setError("动作 JSON 格式错误：" + (err as Error).message);
         setSaving(false);
         return;
       }
@@ -56,8 +96,7 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
           name,
           description,
           enabled,
-          priority,
-          conditions: parsedConditions,
+          condition: parsedCondition,
           actions: parsedActions,
         });
       } else {
@@ -65,48 +104,25 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
           name,
           description,
           enabled,
-          priority,
-          conditions: parsedConditions,
+          condition: parsedCondition,
           actions: parsedActions,
-        } as any);
+        });
       }
 
       onSave();
     } catch (err) {
-      setError("保存失败");
+      setError("保存失败：" + (err as Error).message);
       console.error(err);
     } finally {
       setSaving(false);
     }
   };
 
-  const validateRule = async () => {
-    if (!rule) {
-      alert("请先保存规则后再验证");
-      return;
-    }
-    try {
-      const result = await apiClient.validateRule(rule.id);
-      if (result.valid) {
-        alert("规则验证通过");
-      } else {
-        alert("规则验证失败：" + (result.errors?.join(", ") || "未知错误"));
-      }
-    } catch (err) {
-      alert("验证失败");
-    }
-  };
-
-  const testRule = async () => {
-    if (!rule) {
-      alert("请先保存规则后再测试");
-      return;
-    }
-    try {
-      const result = await apiClient.testRule(rule.id);
-      alert(`规则测试结果：${result.matched ? "匹配" : "不匹配"}\n测试数据：${JSON.stringify(result.test_data)}`);
-    } catch (err) {
-      alert("测试失败");
+  const loadTemplate = (type: 'condition' | 'action', template: string) => {
+    if (type === 'condition') {
+      setConditionJson(template);
+    } else {
+      setActionsJson(template);
     }
   };
 
@@ -128,6 +144,7 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
       )}
 
       <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+        {/* 基本信息 */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -138,22 +155,21 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="例如：error-log-filter"
+              placeholder="例如：drop-debug-logs"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              优先级
+          <div className="flex items-end">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(e) => setEnabled(e.target.checked)}
+                className="mr-2 h-4 w-4"
+              />
+              <span className="text-sm font-medium text-gray-700">启用规则</span>
             </label>
-            <input
-              type="number"
-              value={priority}
-              onChange={(e) => setPriority(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0"
-            />
           </div>
         </div>
 
@@ -170,87 +186,173 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
           />
         </div>
 
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="mr-2"
-            />
-            <span className="text-sm font-medium text-gray-700">启用规则</span>
-          </label>
-        </div>
-
+        {/* 条件配置 */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-medium text-gray-700">
               条件配置 (JSON)
             </label>
+            <div className="space-x-2">
+              <button
+                type="button"
+                onClick={() => loadTemplate('condition', JSON.stringify({
+                  field: "level",
+                  operator: "eq",
+                  value: "ERROR"
+                }, null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                单条件模板
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('condition', JSON.stringify({
+                  all: [
+                    { field: "level", operator: "eq", value: "ERROR" },
+                    { field: "service", operator: "eq", value: "api" }
+                  ]
+                }, null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                AND 模板
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('condition', JSON.stringify({
+                  any: [
+                    { field: "level", operator: "eq", value: "ERROR" },
+                    { field: "level", operator: "eq", value: "PANIC" }
+                  ]
+                }, null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                OR 模板
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('condition', JSON.stringify({
+                  not: {
+                    field: "environment",
+                    operator: "eq",
+                    value: "dev"
+                  }
+                }, null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                NOT 模板
+              </button>
+            </div>
           </div>
           <textarea
-            value={conditionsJson}
-            onChange={(e) => setConditionsJson(e.target.value)}
+            value={conditionJson}
+            onChange={(e) => setConditionJson(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-            rows={8}
+            rows={10}
           />
-          <p className="mt-2 text-xs text-gray-500">
-            条件示例：
-          </p>
-          <div className="bg-gray-50 p-3 rounded text-xs font-mono text-gray-700">
-            {[
-              '[',
-              '  {"field": "level", "operator": "=", "value": "ERROR"},',
-              '  {"field": "service", "operator": "in", "value": ["api", "web"]}',
-              ']'
-            ].join("\n")}
+          <div className="mt-2 grid grid-cols-2 gap-4 text-xs text-gray-500">
+            <div>
+              <p className="font-medium mb-1">操作符列表：</p>
+              <div className="grid grid-cols-2 gap-1">
+                {OPERATOR_OPTIONS.map(op => (
+                  <div key={op.value}>{op.label}</div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="font-medium mb-1">复合条件：</p>
+              <ul className="space-y-1">
+                <li><code>all</code>: 所有条件都满足 (AND)</li>
+                <li><code>any</code>: 任一条件满足 (OR)</li>
+                <li><code>not</code>: 条件不满足 (NOT)</li>
+                <li>支持任意嵌套组合</li>
+              </ul>
+            </div>
           </div>
         </div>
 
+        {/* 动作配置 */}
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-medium text-gray-700">
               动作配置 (JSON)
             </label>
+            <div className="space-x-2">
+              <button
+                type="button"
+                onClick={() => loadTemplate('action', JSON.stringify([{ type: "drop" }], null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Drop
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('action', JSON.stringify([{ type: "keep" }], null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Keep
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('action', JSON.stringify([{ type: "sample", config: { rate: 0.1 } }], null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Sample
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('action', JSON.stringify([{ type: "mask", config: { field: "password" } }], null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Mask
+              </button>
+              <button
+                type="button"
+                onClick={() => loadTemplate('action', JSON.stringify([{ type: "set", config: { field: "processed", value: true } }], null, 2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Set
+              </button>
+            </div>
           </div>
           <textarea
             value={actionsJson}
             onChange={(e) => setActionsJson(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-            rows={8}
+            rows={10}
           />
-          <p className="mt-2 text-xs text-gray-500">
-            动作示例：
-          </p>
-          <div className="bg-gray-50 p-3 rounded text-xs font-mono text-gray-700">
-            {[
-              '[',
-              '  {"type": "filter", "config": {"sampling": 1.0}},',
-              '  {"type": "drop", "config": {}}',
-              ']'
-            ].join("\n")}
+          <div className="mt-2 text-xs text-gray-500">
+            <p className="font-medium mb-1">动作类型及配置：</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="font-medium">流控制:</span>
+                <ul className="ml-4 space-y-1">
+                  <li><code>keep</code> - 保留并终止</li>
+                  <li><code>drop</code> - 丢弃并终止</li>
+                  <li><code>sample</code> - 采样 (config.rate: 0.0-1.0)</li>
+                </ul>
+              </div>
+              <div>
+                <span className="font-medium">转换:</span>
+                <ul className="ml-4 space-y-1">
+                  <li><code>mask</code> - 掩码 (config.field, config.pattern)</li>
+                  <li><code>truncate</code> - 截断 (config.field, config.max_length)</li>
+                  <li><code>extract</code> - 提取 (config.source_field, config.target_field)</li>
+                  <li><code>rename</code> - 重命名 (config.from, config.to)</li>
+                  <li><code>remove</code> - 删除 (config.fields: string[])</li>
+                  <li><code>set</code> - 设置 (config.field, config.value)</li>
+                </ul>
+              </div>
+              <div>
+                <span className="font-medium">元数据:</span>
+                <ul className="ml-4 space-y-1">
+                  <li><code>mark</code> - 标记 (config.reason)</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
 
-        {rule && (
-          <div className="flex justify-start space-x-3">
-            <button
-              type="button"
-              onClick={validateRule}
-              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
-            >
-              验证规则
-            </button>
-            <button
-              type="button"
-              onClick={testRule}
-              className="px-4 py-2 border border-green-600 text-green-600 rounded-md hover:bg-green-50"
-            >
-              测试规则
-            </button>
-          </div>
-        )}
-
+        {/* 提交按钮 */}
         <div className="flex justify-end space-x-3">
           <button
             type="button"
