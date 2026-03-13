@@ -65,9 +65,8 @@ func NewEngine(cfg Config) (*Engine, error) {
 
 	// If etcd endpoints are provided, set up storage and load rules
 	if len(cfg.EtcdEndpoints) > 0 {
-		// Load processor-specific rules and default rules
+		// Load processor-specific rules
 		processorNamespace := "/rules/clients/" + clientID + "/processor"
-		defaultsNamespace := "/rules/defaults/processor"
 
 		storage, err := storage.NewETCDStorage(storage.ETCDStorageConfig{
 			Endpoints:       cfg.EtcdEndpoints,
@@ -86,8 +85,6 @@ func NewEngine(cfg Config) (*Engine, error) {
 			storage.Close()
 			return nil, fmt.Errorf("failed to load processor rules: %w", err)
 		}
-
-		// TODO: Also load default rules from defaultsNamespace
 	}
 
 	return engine, nil

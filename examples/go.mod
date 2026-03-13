@@ -24,6 +24,7 @@ require (
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
+	github.com/log-system/logos/pkg/rule v0.0.0-00010101000000-000000000000 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -50,3 +51,5 @@ require (
 )
 
 replace github.com/log-system/log-sdk => ../log-sdk/log-sdk
+
+replace github.com/log-system/logos/pkg/rule => ../pkg/rule

@@ -1,5 +1,5 @@
-// Package tests ETCD 配置分发测试
-package tests
+// Package integration ETCD 配置分发测试
+package integration
 
 import (
 	"context"
@@ -155,9 +155,9 @@ func TestETCD_WatchConfig(t *testing.T) {
 	// 在 goroutine 中修改值
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		nativeCli.Put(ctx, key, "updated-value")
+		_, _ = nativeCli.Put(ctx, key, "updated-value")
 		time.Sleep(100 * time.Millisecond)
-		nativeCli.Put(ctx, key, "final-value")
+		_, _ = nativeCli.Put(ctx, key, "final-value")
 	}()
 
 	// 接收变更
@@ -179,7 +179,7 @@ func TestETCD_WatchConfig(t *testing.T) {
 	assert.Equal(t, 2, changeCount)
 
 	// 清理
-	nativeCli.Delete(ctx, key)
+	_, _ = nativeCli.Delete(ctx, key)
 }
 
 // TestETCD_DistributionLatency ETCD 配置分发延迟测试
@@ -238,7 +238,7 @@ func TestETCD_DistributionLatency(t *testing.T) {
 	// 清理
 	for i := 0; i < 100; i++ {
 		key := fmt.Sprintf("/analyzer/config/latency-test-%d", i)
-		cli.Delete(ctx, key)
+		_ = cli.Delete(ctx, key)
 	}
 }
 
@@ -268,7 +268,7 @@ func TestETCD_ConcurrentAccess(t *testing.T) {
 				Name:    fmt.Sprintf("concurrent-rule-%d", id),
 				Version: 1,
 			}
-			cli.Put(ctx, key, rule)
+			_ = cli.Put(ctx, key, rule)
 			done <- true
 		}(i)
 	}
@@ -284,5 +284,5 @@ func TestETCD_ConcurrentAccess(t *testing.T) {
 	assert.NotNil(t, value)
 
 	// 清理
-	cli.Delete(ctx, key)
+	_ = cli.Delete(ctx, key)
 }

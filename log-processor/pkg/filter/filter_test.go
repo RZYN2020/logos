@@ -286,8 +286,8 @@ func TestFilterEnginePriority(t *testing.T) {
 		},
 	}
 
-	engine.AddFilter(cfg1)
-	engine.AddFilter(cfg2)
+	_ = engine.AddFilter(cfg1)
+	_ = engine.AddFilter(cfg2)
 
 	entry := &filter.ParsedLog{
 		Level:   "CRITICAL",

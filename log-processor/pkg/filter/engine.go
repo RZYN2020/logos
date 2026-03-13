@@ -1,4 +1,4 @@
-// Package filter 提供日志过滤功能
+// Package filter 提供日志过滤功能，使用统一规则引擎
 package filter
 
 import (
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/log-system/log-processor/pkg/config"
+	"github.com/log-system/log-processor/pkg/rule"
+	unifiedRule "github.com/log-system/logos/pkg/rule"
 )
 
 // FilterEngine 过滤引擎接口
@@ -17,6 +19,7 @@ type FilterEngine interface {
 	AddFilter(cfg *config.FilterConfig) error
 	RemoveFilter(id string) error
 	ReloadFilters() error
+	Close() error
 }
 
 // ParsedLog 解析后的日志
@@ -106,6 +109,11 @@ func (e *FilterEngineImpl) ReloadFilters(manager config.ConfigManager) error {
 
 	// 重新加载
 	return e.LoadFilters(manager)
+}
+
+// Close 关闭引擎
+func (e *FilterEngineImpl) Close() error {
+	return nil
 }
 
 // ApplyFilters 应用所有过滤规则
@@ -299,4 +307,112 @@ func getFieldValue(entry *ParsedLog, field string) string {
 		}
 		return ""
 	}
+}
+
+// RuleFilterEngine 基于统一规则引擎的过滤器
+type RuleFilterEngine struct {
+	engine *rule.Engine
+}
+
+// NewRuleFilterEngine 创建规则过滤引擎
+func NewRuleFilterEngine(engine *rule.Engine) *RuleFilterEngine {
+	return &RuleFilterEngine{
+		engine: engine,
+	}
+}
+
+// ApplyFilters 应用规则过滤
+func (e *RuleFilterEngine) ApplyFilters(entry *ParsedLog) FilterResult {
+	result := FilterResult{
+		ShouldKeep: true,
+		Action:     config.ActionAllow,
+		Metadata:   make(map[string]interface{}),
+	}
+
+	if e.engine == nil {
+		return result
+	}
+
+	// 转换为统一规则引擎的 LogEntry
+	entryData := make(map[string]interface{})
+	entryData["level"] = entry.Level
+	entryData["message"] = entry.Message
+	entryData["service"] = entry.Service
+	entryData["trace_id"] = entry.TraceID
+	entryData["span_id"] = entry.SpanID
+	entryData["raw"] = entry.Raw
+	for k, v := range entry.Fields {
+		entryData[k] = v
+	}
+
+	logEntry := unifiedRule.NewMapLogEntry(entryData)
+
+	// 评估规则
+	shouldKeep, results, _ := e.engine.Evaluate(logEntry)
+	result.ShouldKeep = shouldKeep
+
+	// 填充结果信息
+	if len(results) > 0 {
+		lastResult := results[len(results)-1]
+		result.MatchedRule = lastResult.RuleName
+		result.Metadata["rule_id"] = lastResult.RuleID
+		result.Metadata["actions"] = lastResult.Actions
+	}
+
+	return result
+}
+
+// AddFilter 添加过滤配置（不适用于规则引擎）
+func (e *RuleFilterEngine) AddFilter(cfg *config.FilterConfig) error {
+	return fmt.Errorf("AddFilter not supported for RuleFilterEngine")
+}
+
+// RemoveFilter 删除过滤配置（不适用于规则引擎）
+func (e *RuleFilterEngine) RemoveFilter(id string) error {
+	return fmt.Errorf("RemoveFilter not supported for RuleFilterEngine")
+}
+
+// ReloadFilters 重新加载过滤配置（不适用于规则引擎）
+func (e *RuleFilterEngine) ReloadFilters() error {
+	return fmt.Errorf("ReloadFilters not supported for RuleFilterEngine")
+}
+
+// Close 关闭引擎
+func (e *RuleFilterEngine) Close() error {
+	if e.engine != nil {
+		return e.engine.Close()
+	}
+	return nil
+}
+
+// LegacyFilterEngine 传统过滤器引擎（空实现）
+type LegacyFilterEngine struct{}
+
+// ApplyFilters 空实现
+func (e *LegacyFilterEngine) ApplyFilters(entry *ParsedLog) FilterResult {
+	return FilterResult{
+		ShouldKeep: true,
+		Action:     config.ActionAllow,
+		Metadata:   make(map[string]interface{}),
+	}
+}
+
+// AddFilter 空实现
+func (e *LegacyFilterEngine) AddFilter(cfg *config.FilterConfig) error {
+	return nil
+}
+
+// RemoveFilter 空实现
+func (e *LegacyFilterEngine) RemoveFilter(id string) error {
+	return nil
+}
+
+// ReloadFilters 空实现
+func (e *LegacyFilterEngine) ReloadFilters() error {
+	return nil
+}
+
+// Close 空实现
+func (e *LegacyFilterEngine) Close() error {
+	return nil
 }

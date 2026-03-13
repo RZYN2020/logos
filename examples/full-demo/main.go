@@ -5,13 +5,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -87,7 +90,7 @@ func main() {
 
 	// 步骤 4: 展示消费到的日志
 	fmt.Println("[4/5] 展示从 Kafka 消费到的日志:")
-	fmt.Println("  " + stringsRepeat("─", 80))
+	fmt.Println("  " + strings.Repeat("─", 80))
 
 	receivedCount := 0
 	timeout := time.After(15 * time.Second)
@@ -101,7 +104,7 @@ func main() {
 
 		case <-timeout:
 			done = true
-			fmt.Println("  " + stringsRepeat("─", 80))
+			fmt.Println("  " + strings.Repeat("─", 80))
 			fmt.Printf("\n  超时，共收到 %d 条消息\n", receivedCount)
 		}
 	}
@@ -254,7 +257,7 @@ func checkElasticsearch(url string) {
 	resp, err = fetchURL(url + "/_cat/indices?v")
 	if err == nil {
 		fmt.Println("  索引列表:")
-		fmt.Println("    " + stringsReplace(resp, "\n", "\n    ", -1))
+		fmt.Println("    " + strings.ReplaceAll(resp, "\n", "\n    ", -1))
 	}
 }
 
@@ -273,53 +276,12 @@ func fetchURL(url string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := os.ReadFile(resp.Body)
-	return string(body), err
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
-// 缺失的辅助函数
-func stringsRepeat(s string, count int) string {
-	result := ""
-	for i := 0; i < count; i++ {
-		result += s
-	}
-	return result
-}
-
-func stringsReplace(s, old, new string, n int) string {
-	// 简单实现
-	result := ""
-	parts := splitString(s, old)
-	for i, part := range parts {
-		if i > 0 {
-			if n > 0 || n < 0 {
-				result += new
-				if n > 0 {
-					n--
-				}
-			} else {
-				result += old
-			}
-		}
-		result += part
-	}
-	return result
-}
-
-func splitString(s, sep string) []string {
-	// 简单实现
-	if sep == "" {
-		return []string{s}
-	}
-	var result []string
-	start := 0
-	for i := 0; i+len(sep) <= len(s); i++ {
-		if s[i:i+len(sep)] == sep {
-			result = append(result, s[start:i])
-			start = i + len(sep)
-			i += len(sep) - 1
-		}
-	}
-	result = append(result, s[start:])
-	return result
-}
+// 辅助函数使用标准库 strings 包

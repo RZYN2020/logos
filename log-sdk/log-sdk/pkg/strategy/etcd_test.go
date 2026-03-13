@@ -103,7 +103,9 @@ func TestEtcdClient_Integration_LoadStrategies(t *testing.T) {
 	}
 
 	// Clean up
-	defer client.DeleteStrategy("test-strategy")
+	defer func() {
+		_ = client.DeleteStrategy("test-strategy")
+	}()
 
 	// Load strategies
 	strategies, err := client.LoadStrategies()
@@ -145,7 +147,9 @@ func TestEtcdClient_Integration_Watch(t *testing.T) {
 	}
 
 	// Clean up
-	defer client.DeleteStrategy("watch-test")
+	defer func() {
+		_ = client.DeleteStrategy("watch-test")
+	}()
 
 	// Wait for event or timeout
 	select {

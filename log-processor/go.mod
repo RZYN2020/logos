@@ -3,10 +3,13 @@ module github.com/log-system/log-processor
 go 1.25
 
 require (
+	github.com/log-system/logos/pkg/rule v0.0.0
 	github.com/olivere/elastic/v7 v7.0.32
 	github.com/segmentio/kafka-go v0.4.46
 	go.etcd.io/etcd/client/v3 v3.6.8
 )
+
+replace github.com/log-system/logos/pkg/rule => ../pkg/rule
 
 require (
 	github.com/coreos/go-semver v0.3.1 // indirect

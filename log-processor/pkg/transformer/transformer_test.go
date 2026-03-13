@@ -577,7 +577,7 @@ func TestTransformer_AnalysisSentiment(t *testing.T) {
 		Language:  "en",
 	}
 
-	result, err := tf.Transform(parsed, analysis)
+	_, err := tf.Transform(parsed, analysis)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -590,10 +590,10 @@ func TestTransformer_AnalysisSentiment(t *testing.T) {
 		Extractor:   "direct",
 		Enabled:     true,
 	}
-	tf.AddRule(rule)
+	_ = tf.AddRule(rule)
 
 	// Re-transform
-	result, err = tf.Transform(parsed, analysis)
+	result, err := tf.Transform(parsed, analysis)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

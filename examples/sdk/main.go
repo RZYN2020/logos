@@ -2,7 +2,6 @@
 package main
 
 import (
-	"errors"
 	"time"
 
 	"github.com/log-system/log-sdk/pkg/logger"
@@ -139,9 +138,4 @@ func demoWithFields(log logger.Logger) {
 
 	// 传统风格也同样继承字段
 	requestLog.Printf("Request completed in %dms", 150)
-}
-
-// someFunction 模拟一个可能出错的函数
-func someFunction() error {
-	return errors.New("internal error")
 }

@@ -242,7 +242,7 @@ func (p *SyslogParser) Parse(raw []byte) (*ParsedLog, error) {
 // parsePriority 解析 syslog 优先级
 func parsePriority(s string) int {
 	var priority int
-	fmt.Sscanf(s, "%d", &priority)
+	fmt.Sscanf(s, "%d", &priority) // nolint:errcheck
 	return priority
 }
 
@@ -360,7 +360,7 @@ func parseApacheTimestamp(s string) time.Time {
 // parseStatus 解析状态码
 func parseStatus(s string) int {
 	var status int
-	fmt.Sscanf(s, "%d", &status)
+	fmt.Sscanf(s, "%d", &status) // nolint:errcheck
 	return status
 }
 

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +14,6 @@ import (
 	"github.com/log-system/log-analyzer/internal/handlers"
 	"github.com/log-system/log-analyzer/internal/middleware"
 	"github.com/log-system/log-analyzer/internal/models"
-	"github.com/log-system/log-analyzer/internal/analysis"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -105,7 +103,7 @@ func (s *TestServer) login(t *testing.T) string {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	return response["token"].(string)
 }
 
@@ -150,7 +148,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var rules []models.Rule
-		json.Unmarshal(w.Body.Bytes(), &rules)
+		_ = json.Unmarshal(w.Body.Bytes(), &rules)
 		assert.Greater(t, len(rules), 0)
 	})
 
@@ -162,7 +160,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
-		json.Unmarshal(w.Body.Bytes(), &rules)
+		_ = json.Unmarshal(w.Body.Bytes(), &rules)
 
 		if len(rules) > 0 {
 			ruleID := rules[0].ID
@@ -175,7 +173,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 			assert.Equal(t, http.StatusOK, w.Code)
 
 			var response map[string]interface{}
-			json.Unmarshal(w.Body.Bytes(), &response)
+			_ = json.Unmarshal(w.Body.Bytes(), &response)
 			assert.Equal(t, true, response["valid"])
 		}
 	})
@@ -187,7 +185,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
-		json.Unmarshal(w.Body.Bytes(), &rules)
+		_ = json.Unmarshal(w.Body.Bytes(), &rules)
 
 		if len(rules) > 0 {
 			ruleID := rules[0].ID
@@ -208,7 +206,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
-		json.Unmarshal(w.Body.Bytes(), &rules)
+		_ = json.Unmarshal(w.Body.Bytes(), &rules)
 
 		if len(rules) > 0 {
 			ruleID := rules[0].ID
@@ -239,7 +237,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
-		json.Unmarshal(w.Body.Bytes(), &rules)
+		_ = json.Unmarshal(w.Body.Bytes(), &rules)
 
 		if len(rules) > 0 {
 			ruleID := rules[0].ID
@@ -279,7 +277,7 @@ func TestIntegration_LogAnalysis(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NotNil(t, response["patterns"])
 	})
 
@@ -306,7 +304,7 @@ func TestIntegration_LogAnalysis(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NotNil(t, response["recommendations"])
 	})
 }
@@ -327,7 +325,7 @@ func TestIntegration_Authentication(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NotNil(t, response["token"])
 		assert.NotNil(t, response["user"])
 	})
@@ -344,7 +342,7 @@ func TestIntegration_Authentication(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NotNil(t, response["token"])
 	})
 

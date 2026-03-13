@@ -89,7 +89,7 @@ func TestRingBuffer_PushBatchPartial(t *testing.T) {
 
 	// Fill the buffer partially
 	for i := 0; i < 2; i++ {
-		rb.Push(LogMessage{Topic: "filler"})
+		_ = rb.Push(LogMessage{Topic: "filler"})
 	}
 
 	// Try to push more than available
@@ -109,7 +109,7 @@ func TestRingBuffer_PopBatch(t *testing.T) {
 
 	// Push 5 messages
 	for i := 0; i < 5; i++ {
-		rb.Push(LogMessage{Topic: "test"})
+		_ = rb.Push(LogMessage{Topic: "test"})
 	}
 
 	// Pop 3 messages
@@ -129,7 +129,7 @@ func TestRingBuffer_PopBatchMoreThanAvailable(t *testing.T) {
 
 	// Push 3 messages
 	for i := 0; i < 3; i++ {
-		rb.Push(LogMessage{Topic: "test"})
+		_ = rb.Push(LogMessage{Topic: "test"})
 	}
 
 	// Try to pop 10
@@ -145,12 +145,12 @@ func TestRingBuffer_WrapAround(t *testing.T) {
 
 	// Fill buffer
 	for i := 0; i < 4; i++ {
-		rb.Push(LogMessage{Topic: "first"})
+		_ = rb.Push(LogMessage{Topic: "first"})
 	}
 
 	// Pop 2 (create space at beginning)
 	for i := 0; i < 2; i++ {
-		rb.Pop()
+		_, _ = rb.Pop()
 	}
 
 	// Push 2 more (should wrap around)
@@ -187,7 +187,7 @@ func TestRingBuffer_IsEmptyIsFull(t *testing.T) {
 
 	// Fill it
 	for i := 0; i < 4; i++ {
-		rb.Push(LogMessage{})
+		_ = rb.Push(LogMessage{})
 	}
 
 	if rb.IsEmpty() {
@@ -224,9 +224,9 @@ func BenchmarkRingBuffer_Push(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if rb.IsFull() {
-			rb.Pop() // make room
+			_, _ = rb.Pop() // make room
 		}
-		rb.Push(msg)
+		_ = rb.Push(msg)
 	}
 }
 

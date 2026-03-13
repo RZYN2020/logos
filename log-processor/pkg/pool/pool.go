@@ -49,10 +49,6 @@ func (p *ParsedLogPool) Put(log *parser.ParsedLog) {
 	p.pool.Put(log)
 }
 
-func nilTime() interface{} {
-	return nil
-}
-
 // ByteSlicePool 字节切片池
 type ByteSlicePool struct {
 	pool sync.Pool

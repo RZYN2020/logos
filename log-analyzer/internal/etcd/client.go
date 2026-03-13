@@ -1,5 +1,5 @@
-// Package etcdclient ETCD 客户端封装
-package etcdclient
+// Package etcd ETCD 客户端封装
+package etcd
 
 import (
 	"context"

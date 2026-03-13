@@ -1,11 +1,10 @@
-// Package tests 用户场景验收测试
-package tests
+// Package integration 用户场景验收测试
+package integration
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -60,7 +59,7 @@ func TestScenario_UserLogin(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	_ = json.NewDecoder(resp.Body).Decode(&result)
 	assert.NotNil(t, result["token"])
 	t.Log("管理员登录成功")
 }
@@ -102,7 +101,7 @@ func TestScenario_RuleLifecycle(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var createResult map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&createResult)
+	_ = json.NewDecoder(resp.Body).Decode(&createResult)
 	ruleID := createResult["id"].(string)
 	assert.NotEmpty(t, ruleID)
 	t.Logf("规则创建成功，ID: %s", ruleID)
@@ -269,7 +268,7 @@ func TestScenario_ImportExport(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var exportResult map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&exportResult)
+	_ = json.NewDecoder(resp.Body).Decode(&exportResult)
 	t.Logf("规则导出成功，共 %v 条规则", len(exportResult["rules"].([]interface{})))
 
 	// 2. 导入规则
@@ -318,7 +317,7 @@ func loginAndGetToken(t *testing.T) string {
 	}
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	_ = json.NewDecoder(resp.Body).Decode(&result)
 
 	token, ok := result["token"].(string)
 	if !ok {

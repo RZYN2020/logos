@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/log-system/log-processor/pkg/analyzer"
-	"github.com/log-system/log-processor/pkg/config"
 	"github.com/log-system/log-processor/pkg/filter"
 	processorRule "github.com/log-system/log-processor/pkg/rule"
 	"github.com/log-system/log-processor/pkg/parser"
@@ -48,7 +47,6 @@ type Processor struct {
 	transformer  *transformer.TransformerImpl
 	builder      *semantic.Builder
 	sink         sink.Sink
-	configMgr    config.ConfigManager
 	batch        []sink.LogEntry
 	lastFlush    time.Time
 }

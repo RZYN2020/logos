@@ -195,7 +195,7 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 	content, _ := json.Marshal(rule)
-	json.Unmarshal(content, &version.Content)
+	_ = json.Unmarshal(content, &version.Content)
 	h.db.Create(version)
 
 	// 同步到 ETCD
@@ -221,7 +221,7 @@ func (h *RuleHandler) DeleteRule(c *gin.Context) {
 
 	// 从 ETCD 删除 - 使用统一规则的命名空间
 	key := "/rules/clients/analyzer.default/sdk/" + ruleID
-	h.etcdCli.Delete(c.Request.Context(), key)
+	_ = h.etcdCli.Delete(c.Request.Context(), key)
 
 	c.JSON(http.StatusOK, gin.H{"message": "rule deleted"})
 }
@@ -260,7 +260,7 @@ func (h *RuleHandler) RollbackRule(c *gin.Context) {
 
 	// 恢复规则内容
 	content, _ := json.Marshal(versionRecord.Content)
-	json.Unmarshal(content, &rule)
+	_ = json.Unmarshal(content, &rule)
 	rule.Version++
 	rule.UpdatedAt = time.Now()
 

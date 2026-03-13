@@ -80,7 +80,7 @@ func TestCreateRule(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NotNil(t, response["id"])
 	assert.Equal(t, "1", response["version"])
 }
@@ -108,7 +108,7 @@ func TestGetRule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response models.Rule
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, "test-001", response.ID)
 	assert.Equal(t, "test-rule", response.Name)
 }
@@ -134,7 +134,7 @@ func TestListRules(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response []models.Rule
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, 2, len(response))
 }
 
@@ -235,7 +235,7 @@ func TestValidateRule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.Equal(t, true, response["valid"])
 }
 
@@ -264,6 +264,6 @@ func TestTestRule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NotNil(t, response["matched"])
 }

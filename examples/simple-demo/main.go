@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -83,9 +84,9 @@ func main() {
 
 	// 步骤 4: 展示消费到的日志
 	fmt.Println("[4/4] 消费并展示日志:\n")
-	fmt.Println("  " + stringsRepeat("═", 80))
+	fmt.Println("  " + strings.Repeat("═", 80))
 	fmt.Printf("  %-3s | %-5s | %-20s | %s\n", "#", "LEVEL", "SERVICE", "MESSAGE")
-	fmt.Println("  " + stringsRepeat("─", 80))
+	fmt.Println("  " + strings.Repeat("─", 80))
 
 	receivedCount := 0
 	timeout := time.After(10 * time.Second)
@@ -99,7 +100,7 @@ func main() {
 
 		case <-timeout:
 			done = true
-			fmt.Println("  " + stringsRepeat("─", 80))
+			fmt.Println("  " + strings.Repeat("─", 80))
 			fmt.Printf("  共收到 %d 条日志\n", receivedCount)
 		}
 	}
@@ -237,17 +238,4 @@ func checkES(url string) {
 	}
 	defer resp.Body.Close()
 
-	var health map[string]interface{}
-	if json.NewDecoder(resp.Body).Decode(&health) == nil {
-		status, _ := health["status"].(string)
-		fmt.Printf("                   (cluster: %s)\n", status)
-	}
-}
-
-func stringsRepeat(s string, n int) string {
-	res := ""
-	for i := 0; i < n; i++ {
-		res += s
-	}
-	return res
 }
