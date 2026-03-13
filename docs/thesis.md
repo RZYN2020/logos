@@ -7,6 +7,10 @@
 
 
 
++ https://box.nju.edu.cn/d/113ddaf0a67f46beaf4b/files/?p=%2F522022000034_%E5%BC%A0%E9%AA%9E_%E9%A2%84%E7%AD%94%E8%BE%A9_20240308.pdf
++ https://box.nju.edu.cn/d/113ddaf0a67f46beaf4b/files/?p=%2F522022320007_%E9%99%88%E9%B9%8F%E5%85%8B_%E9%A2%84%E7%AD%94%E8%BE%A9_20240317.pdf
++ https://box.nju.edu.cn/d/113ddaf0a67f46beaf4b/files/?p=%2F522022320081_%E6%9D%8E%E4%BA%91%E9%A3%9E_%E9%A2%84%E7%AD%94%E8%BE%A9_20240317.pdf
+
 核心目标->分析日志，降本增效：
 
 1. **主论点1**: 应用侧动态配置过滤裁剪策略 Etcd，可以在字符串构建前对日志进行过滤

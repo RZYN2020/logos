@@ -19,7 +19,7 @@ func TestETCD_ConfigDistribution(t *testing.T) {
 	// 创建 ETCD 客户端
 	cfg := etcd.Config{
 		Endpoints:   []string{"localhost:2379"},
-		DialTimeout: 5 * time.Second,
+		DialTimeout: 2 * time.Second,
 	}
 
 	cli, err := etcd.NewClient(cfg)
@@ -29,7 +29,16 @@ func TestETCD_ConfigDistribution(t *testing.T) {
 	}
 	defer cli.Close()
 
-	ctx := context.Background()
+	// 测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err = cli.Get(ctx, "/analyzer/health")
+	if err != nil {
+		t.Skipf("跳过测试：ETCD 不可用 (%v)", err)
+		return
+	}
+
+	ctx = context.Background()
 
 	// 测试 1: 存储规则配置
 	t.Run("PutRuleConfig", func(t *testing.T) {
@@ -115,7 +124,7 @@ func TestETCD_ConfigDistribution(t *testing.T) {
 func TestETCD_WatchConfig(t *testing.T) {
 	cfg := etcd.Config{
 		Endpoints:   []string{"localhost:2379"},
-		DialTimeout: 5 * time.Second,
+		DialTimeout: 2 * time.Second,
 	}
 
 	cli, err := etcd.NewClient(cfg)
@@ -125,7 +134,16 @@ func TestETCD_WatchConfig(t *testing.T) {
 	}
 	defer cli.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// 测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err = cli.Get(ctx, "/analyzer/health")
+	if err != nil {
+		t.Skipf("跳过测试：ETCD 不可用 (%v)", err)
+		return
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// 创建原生 ETCD 客户端用于 Watch
@@ -186,7 +204,7 @@ func TestETCD_WatchConfig(t *testing.T) {
 func TestETCD_DistributionLatency(t *testing.T) {
 	cfg := etcd.Config{
 		Endpoints:   []string{"localhost:2379"},
-		DialTimeout: 5 * time.Second,
+		DialTimeout: 2 * time.Second,
 	}
 
 	cli, err := etcd.NewClient(cfg)
@@ -196,7 +214,16 @@ func TestETCD_DistributionLatency(t *testing.T) {
 	}
 	defer cli.Close()
 
-	ctx := context.Background()
+	// 测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err = cli.Get(ctx, "/analyzer/health")
+	if err != nil {
+		t.Skipf("跳过测试：ETCD 不可用 (%v)", err)
+		return
+	}
+
+	ctx = context.Background()
 
 	// 测试 100 次写入延迟
 	var latencies []time.Duration
@@ -246,7 +273,7 @@ func TestETCD_DistributionLatency(t *testing.T) {
 func TestETCD_ConcurrentAccess(t *testing.T) {
 	cfg := etcd.Config{
 		Endpoints:   []string{"localhost:2379"},
-		DialTimeout: 5 * time.Second,
+		DialTimeout: 2 * time.Second,
 	}
 
 	cli, err := etcd.NewClient(cfg)
@@ -256,7 +283,16 @@ func TestETCD_ConcurrentAccess(t *testing.T) {
 	}
 	defer cli.Close()
 
-	ctx := context.Background()
+	// 测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err = cli.Get(ctx, "/analyzer/health")
+	if err != nil {
+		t.Skipf("跳过测试：ETCD 不可用 (%v)", err)
+		return
+	}
+
+	ctx = context.Background()
 	key := "/analyzer/config/concurrent-test"
 
 	// 并发写入
