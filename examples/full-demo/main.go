@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Logos 日志系统 - 全链路演示 ===\n")
+	fmt.Println("=== Logos 日志系统 - 全链路演示 ===")
 
 	// 配置
 	kafkaBrokers := []string{"localhost:9092"}
@@ -46,7 +46,7 @@ func main() {
 		MaxBufferSize:     1000,
 	})
 	defer logSDK.Close()
-	fmt.Println("  ✓ Log SDK 初始化完成\n")
+	fmt.Println("  ✓ Log SDK 初始化完成")
 
 	// 步骤 2: 启动 Kafka 消费者（模拟 Log Processor）
 	fmt.Println("[2/5] 启动 Kafka 消费者（模拟 Log Processor）...")
@@ -66,7 +66,7 @@ func main() {
 	msgChan := make(chan kafka.Message, 100)
 
 	go func() {
-		fmt.Println("  ✓ 消费者已启动，等待消息...\n")
+		fmt.Println("  ✓ 消费者已启动，等待消息...")
 		for {
 			select {
 			case <-ctx.Done():
@@ -137,7 +137,7 @@ func generateTestLogs(log logger.Logger) {
 	// 等待一小会儿让消费者启动
 	time.Sleep(1 * time.Second)
 
-	fmt.Println("  ✓ 开始发送日志到 Kafka...\n")
+	fmt.Println("  ✓ 开始发送日志到 Kafka...")
 
 	// 生成各种类型的日志
 	log.Info("应用启动成功").
@@ -195,7 +195,7 @@ func generateTestLogs(log logger.Logger) {
 		log.Info("批量测试日志").
 			Int("batch_id", i).
 			Str("type", "test").
-			Time("timestamp", time.Now()).
+			Str("timestamp", time.Now().Format(time.RFC3339)).
 			Send()
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -206,7 +206,7 @@ func generateTestLogs(log logger.Logger) {
 }
 
 func displayLogMessage(msg kafka.Message, count int) {
-	var logEntry map[string]interface{}
+	var logEntry map[string]any
 	if err := json.Unmarshal(msg.Value, &logEntry); err == nil {
 		level, _ := logEntry["level"].(string)
 		message, _ := logEntry["message"].(string)
@@ -247,7 +247,7 @@ func checkElasticsearch(url string) {
 		return
 	}
 
-	var health map[string]interface{}
+	var health map[string]any
 	if err := json.Unmarshal([]byte(resp), &health); err == nil {
 		status, _ := health["status"].(string)
 		fmt.Printf("  ✓ Elasticsearch 集群状态: %s\n", status)
@@ -257,7 +257,7 @@ func checkElasticsearch(url string) {
 	resp, err = fetchURL(url + "/_cat/indices?v")
 	if err == nil {
 		fmt.Println("  索引列表:")
-		fmt.Println("    " + strings.ReplaceAll(resp, "\n", "\n    ", -1))
+		fmt.Println("    " + strings.ReplaceAll(resp, "\n", "\n    "))
 	}
 }
 
