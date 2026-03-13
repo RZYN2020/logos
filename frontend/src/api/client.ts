@@ -2,7 +2,6 @@
 import type {
   ApiResponse,
   Rule,
-  RuleVersion,
   SystemInfo,
   HealthCheck,
 } from "./types";
@@ -15,8 +14,12 @@ export const apiClient = {
   // 获取所有规则
   async listRules(): Promise<Rule[]> {
     const res = await fetch(`${API_BASE}/rules`);
-    const data: ApiResponse<Rule[]> = await res.json();
-    return data.data?.rules || data.data || [];
+    const data: ApiResponse<Rule[] | { rules: Rule[] }> = await res.json();
+    // 处理两种可能的响应格式：直接返回数组或 { rules: Rule[] }
+    if (Array.isArray(data.data)) {
+      return data.data;
+    }
+    return data.data?.rules || [];
   },
 
   // 获取单个规则

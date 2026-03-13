@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { apiClient, type Rule } from "./api/client";
+import type { Rule, Condition, Action } from "../api/types";
+import { apiClient } from "../api/client";
 
 export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
   const [rules, setRules] = useState<Rule[]>([]);
@@ -133,7 +134,7 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-xs text-gray-500">
-                      {rule.actions.map(a => a.type).join(', ')}
+                      {rule.actions.map((a: Action) => a.type).join(', ')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -161,7 +162,7 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
 }
 
 // 获取条件摘要
-function getConditionSummary(condition: import("./api/client").Condition): string {
+function getConditionSummary(condition: Condition): string {
   if (condition.all) {
     return `AND (${condition.all.length} 条件)`;
   }

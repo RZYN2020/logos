@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { apiClient } from "./api/client";
+import { useState } from "react";
 
 export default function LogAnalyzer() {
   const [query, setQuery] = useState<string>("SELECT * FROM logs LIMIT 100");

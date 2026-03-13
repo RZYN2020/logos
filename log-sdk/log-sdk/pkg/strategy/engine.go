@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -147,7 +148,17 @@ func (e *Engine) matchCondition(cond Condition, level, service, environment stri
 	if cond.Environment != "" && cond.Environment != environment {
 		return false
 	}
-	// TODO: 实现路径模式匹配
+	// 路径模式匹配
+	if cond.PathPattern != "" {
+		path, ok := fields["path"].(string)
+		if !ok {
+			return false // 没有 path 字段，不匹配
+		}
+		matched, err := filepath.Match(cond.PathPattern, path)
+		if err != nil || !matched {
+			return false
+		}
+	}
 	return true
 }
 

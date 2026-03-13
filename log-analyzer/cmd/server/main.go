@@ -205,10 +205,34 @@ func (s *Server) queryHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: 实现 Elasticsearch 查询
+	// 设置默认 limit
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+
+	// 模拟查询结果（实际应连接 Elasticsearch）
+	// 这里返回示例数据用于演示
+	entries := []map[string]interface{}{
+		{
+			"timestamp": "2024-01-22T10:00:00Z",
+			"level":     "INFO",
+			"service":   "api-gateway",
+			"message":   "Request received",
+			"trace_id":  "7a3c9f8d5e2b1a4",
+		},
+		{
+			"timestamp": "2024-01-22T10:00:01Z",
+			"level":     "ERROR",
+			"service":   "payment-service",
+			"message":   "Payment processing failed",
+			"trace_id":  "7a3c9f8d5e2b1a5",
+		},
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"total":   0,
-		"entries": []interface{}{},
+		"total":   len(entries),
+		"entries": entries,
 	})
 }
 
@@ -220,10 +244,20 @@ func (s *Server) searchHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: 实现搜索功能
+	// 模拟搜索结果
+	entries := []map[string]interface{}{
+		{
+			"timestamp": "2024-01-22T10:00:00Z",
+			"level":     "INFO",
+			"service":   "api-gateway",
+			"message":   query,
+			"trace_id":  "7a3c9f8d5e2b1a4",
+		},
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"total":   0,
-		"entries": []interface{}{},
+		"total":   1,
+		"entries": entries,
 	})
 }
 
@@ -240,11 +274,18 @@ func (s *Server) aggregateHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: 实现聚合分析
+	// 模拟聚合分析结果
 	c.JSON(http.StatusOK, gin.H{
-		"total_logs":     0,
-		"error_rate":     0.0,
-		"top_services":   []string{},
+		"total_logs":   1000,
+		"error_rate":   0.05,
+		"top_services": []string{"api-gateway", "user-service", "payment-service"},
+		"by_level": map[string]int{
+			"INFO":  700,
+			"WARN":  150,
+			"ERROR": 100,
+			"FATAL": 30,
+			"PANIC": 20,
+		},
 	})
 }
 

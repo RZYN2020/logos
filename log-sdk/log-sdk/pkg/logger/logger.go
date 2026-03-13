@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
 	"sync"
 	"time"
@@ -49,18 +50,31 @@ func LevelHook(minLevel Level) Hook {
 
 // RegexHook 创建一个基于字段正则匹配的 Hook
 func RegexHook(field, pattern string) Hook {
+	compiled := regexp.MustCompile(pattern)
 	return Func(func(entry LogEntry) bool {
+		var value string
 		switch field {
 		case "cluster":
-			// TODO: 支持正则匹配
-			return true
+			value = entry.Cluster
 		case "pod":
-			return true
+			value = entry.Pod
 		case "file":
-			return true
+			value = entry.File
+		case "message":
+			value = entry.Message
+		case "service":
+			value = entry.Service
+		case "level":
+			value = entry.Level
 		default:
-			return true
+			// 尝试从 Fields 中获取
+			if v, ok := entry.Fields[field]; ok {
+				value = fmt.Sprintf("%v", v)
+			} else {
+				return true // 字段不存在时不过滤
+			}
 		}
+		return compiled.MatchString(value)
 	})
 }
 

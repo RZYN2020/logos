@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { apiClient, type Rule, type Condition, type Action, type ActionType, type ConditionOperator } from "./api/client";
+import type { Rule, Condition, Action, ConditionOperator } from "../api/types";
+import { apiClient } from "../api/client";
 
 interface Props {
   rule?: Rule;
@@ -24,23 +25,6 @@ const OPERATOR_OPTIONS: { value: ConditionOperator; label: string }[] = [
   { value: 'exists', label: '字段存在 (exists)' },
   { value: 'not_exists', label: '字段不存在 (not_exists)' },
 ];
-
-// 动作类型选项
-const ACTION_TYPE_OPTIONS: { value: ActionType; label: string }[] = [
-  { value: 'keep', label: '保留并终止 (keep)' },
-  { value: 'drop', label: '丢弃并终止 (drop)' },
-  { value: 'sample', label: '采样 (sample)' },
-  { value: 'mask', label: '掩码敏感数据 (mask)' },
-  { value: 'truncate', label: '截断字段 (truncate)' },
-  { value: 'extract', label: '提取子串 (extract)' },
-  { value: 'rename', label: '重命名字段 (rename)' },
-  { value: 'remove', label: '删除字段 (remove)' },
-  { value: 'set', label: '设置字段值 (set)' },
-  { value: 'mark', label: '添加标记 (mark)' },
-];
-
-// 条件类型
-type ConditionType = 'single' | 'all' | 'any' | 'not';
 
 export default function RuleForm({ rule, onSave, onCancel }: Props) {
   const [name, setName] = useState(rule?.name || "");
