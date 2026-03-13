@@ -204,6 +204,9 @@ func (e *Engine) Close() error {
 
 func extractIDFromKey(key string) string {
 	// 从 "/strategies/{id}" 提取 id
-	// 简化实现
-	return key[len("/strategies/"):]
+	prefix := "/strategies/"
+	if len(key) <= len(prefix) {
+		return ""
+	}
+	return key[len(prefix):]
 }
