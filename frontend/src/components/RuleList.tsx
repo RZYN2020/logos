@@ -2,7 +2,14 @@ import { useState, useEffect } from "react";
 import type { Rule, Condition, Action } from "../api/types";
 import { apiClient } from "../api/client";
 
-export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
+interface RuleListProps {
+  service: string;
+  component: 'sdk' | 'processor';
+  onEdit: (id: string) => void;
+  onCreate: () => void;
+}
+
+export default function RuleList({ service, component, onEdit, onCreate }: RuleListProps) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -11,7 +18,7 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.listRules();
+      const data = await apiClient.listRules(service, component);
       setRules(data);
     } catch (err) {
       setError("加载规则失败");
@@ -27,49 +34,51 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
       await apiClient.deleteRule(id);
       await loadRules();
     } catch (err) {
-      alert("删除失败");
+      setError("删除失败");
     }
-  };
-
-  const handleEdit = (id: string) => {
-    onEdit(id);
-  };
-
-  const handleCreateNew = () => {
-    onEdit("");
   };
 
   useEffect(() => {
     loadRules();
-  }, []);
+  }, [service, component]);
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <div className="text-2xl animate-spin">⏳</div>
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">加载规则中...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">规则配置管理</h2>
+    <div className="space-y-4">
+      {/* 页面标题 */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">规则配置</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            管理 {service} ({component}) 的日志处理规则
+          </p>
+        </div>
         <button
-          onClick={handleCreateNew}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={onCreate}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
         >
           ➕ 新建规则
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      {/* 规则列表 */}
+      <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -96,8 +105,19 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
           <tbody className="bg-white divide-y divide-gray-200">
             {rules.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  暂无规则，点击「新建规则」创建
+                <td colSpan={6} className="px-6 py-12 text-center">
+                  <div className="text-gray-400 mb-4">
+                    <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 mb-4">暂无规则</p>
+                  <button
+                    onClick={onCreate}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    创建第一条规则
+                  </button>
                 </td>
               </tr>
             ) : (
@@ -139,14 +159,14 @@ export default function RuleList({ onEdit }: { onEdit: (id: string) => void }) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => handleEdit(rule.id)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
+                      onClick={() => onEdit(rule.id)}
+                      className="text-blue-600 hover:text-blue-800 mr-3"
                     >
                       编辑
                     </button>
                     <button
                       onClick={() => handleDelete(rule.id)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-800"
                     >
                       删除
                     </button>

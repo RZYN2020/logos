@@ -1,21 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-export default function LogAnalyzer() {
-  const [query, setQuery] = useState<string>("SELECT * FROM logs LIMIT 100");
+interface LogAnalyzerProps {
+  service: string;
+}
+
+export default function LogAnalyzer({ service }: LogAnalyzerProps) {
+  const [query, setQuery] = useState<string>("SELECT * FROM logs WHERE service = 'api-gateway' LIMIT 100");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 当服务改变时，更新查询
+  useEffect(() => {
+    setQuery(`SELECT * FROM logs WHERE service = '${service}' ORDER BY timestamp DESC LIMIT 100`);
+  }, [service]);
 
   const handleRunQuery = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Mock 查询结果
+      // Mock 查询结果 - 根据当前服务过滤
       const mockResults = [
         {
           timestamp: "2024-01-22T10:00:00Z",
           level: "INFO",
-          service: "api-gateway",
+          service: service,
           message: "Request received",
           trace_id: "7a3c9f8d5e2b1a4",
           user_id: "12345",
@@ -23,15 +32,15 @@ export default function LogAnalyzer() {
         {
           timestamp: "2024-01-22T10:00:01Z",
           level: "INFO",
-          service: "user-service",
+          service: service,
           message: "User authenticated",
           trace_id: "7a3c9f8d5e2b1a4",
           user_id: "12345",
         },
         {
-        timestamp: "2024-01-22T10:00:02Z",
+          timestamp: "2024-01-22T10:00:02Z",
           level: "ERROR",
-          service: "payment-service",
+          service: service,
           message: "Payment processing failed",
           trace_id: "7a3c9f8d5e2b1a5",
           user_id: "12345",
@@ -40,7 +49,7 @@ export default function LogAnalyzer() {
         {
           timestamp: "2024-01-22T10:00:03Z",
           level: "WARN",
-          service: "order-service",
+          service: service,
           message: "Order partially processed",
           trace_id: "7a3c9f8d5e2b1a5",
           user_id: "12345",
@@ -94,9 +103,16 @@ LIMIT 50;`,
 
   return (
     <div className="px-4 py-6">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
-        日志分析
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            日志分析
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            分析 {service} 的日志数据
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 查询编辑器 */}

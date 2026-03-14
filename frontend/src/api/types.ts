@@ -127,14 +127,41 @@ export interface ApiResponse<T = unknown> {
   data?: T;
 }
 
-export interface SystemInfo {
-  system: string;
-  version: string;
-  etcd_version: string;
-  uptime: string;
+// 服务配置相关类型
+export interface ServiceConfig {
+  name: string;
+  components: ServiceComponent[];
 }
 
-export interface HealthCheck {
-  status: string;
-  etcd?: string;
+export interface ServiceComponent {
+  type: 'sdk' | 'processor';
+  name: string;
+  version?: string;
+}
+
+// 日志报告类型
+export interface LogReport {
+  service: string;
+  total_logs: number;
+  time_range: {
+    from: string;
+    to: string;
+  };
+  top_lines: LogLineStat[];
+  top_patterns: LogPatternStat[];
+}
+
+export interface LogLineStat {
+  line_number: number;
+  file?: string;
+  function?: string;
+  count: number;
+  percentage: number;
+}
+
+export interface LogPatternStat {
+  pattern: string;
+  count: number;
+  percentage: number;
+  sample_logs: string[];
 }

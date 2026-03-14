@@ -1,11 +1,17 @@
-import { useState } from "react";
-import type { Rule, Condition, Action, ConditionOperator, ActionType } from "../api/types";
+import { useState, useEffect } from "react";
+import type { Condition, Action, ActionType, ConditionOperator } from "../api/types";
 import { apiClient } from "../api/client";
 
 interface Props {
-  rule?: Rule;
+  ruleId?: string;
+  service: string;
+  component: 'sdk' | 'processor';
   onSave: () => void;
   onCancel: () => void;
+  initialLine?: number;
+  initialFile?: string;
+  initialFunction?: string;
+  initialPattern?: string;
 }
 
 // 操作符选项
@@ -562,18 +568,95 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
   );
 }
 
-export default function RuleForm({ rule, onSave, onCancel }: Props) {
-  const [name, setName] = useState(rule?.name || "");
-  const [description, setDescription] = useState(rule?.description || "");
-  const [enabled, setEnabled] = useState(rule?.enabled ?? true);
+export default function RuleForm({
+  ruleId,
+  service,
+  component,
+  onSave,
+  onCancel,
+  initialLine,
+  initialFile,
+  initialFunction,
+  initialPattern,
+}: Props) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [enabled, setEnabled] = useState(true);
   const [condition, setCondition] = useState<Condition>(
-    rule?.condition || { field: "level", operator: "eq", value: "ERROR" }
+    { field: "level", operator: "eq", value: "ERROR" }
   );
-  const [actions, setActions] = useState<Action[]>(
-    rule?.actions || [{ type: "drop" }]
-  );
+  const [actions, setActions] = useState<Action[]>([{ type: "drop" }]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(!!ruleId);
+
+  // 加载现有规则数据或根据行号/模式生成建议规则
+  useEffect(() => {
+    if (!ruleId && !initialLine && !initialPattern) {
+      setLoading(false);
+      return;
+    }
+
+    const loadRuleData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (ruleId) {
+          // 编辑现有规则
+          const rule = await apiClient.getRule(ruleId);
+          if (rule) {
+            setName(rule.name);
+            setDescription(rule.description || "");
+            setEnabled(rule.enabled ?? true);
+            setCondition(rule.condition);
+            setActions(rule.actions || [{ type: "drop" }]);
+          }
+        } else if (initialPattern) {
+          // 根据模式生成建议规则
+          const suggestedCondition: Condition = {
+            field: "message",
+            operator: "contains",
+            value: initialPattern.split('{')[0]?.trim() || initialPattern,
+          };
+
+          setCondition(suggestedCondition);
+          setName(`规则 - 模式匹配`);
+          setDescription(`自动生成的规则：匹配模式 "${initialPattern}"`);
+
+          // 默认设置为采样动作，因为模式匹配通常用于采样
+          setActions([{ type: "sample", config: { rate: 0.1 } }]);
+        } else if (initialLine) {
+          // 根据行号生成建议规则
+          const suggestedCondition: Condition = {
+            all: [
+              { field: "path", operator: "contains", value: initialFile || "" },
+              { field: "custom_line", operator: "eq", value: initialLine },
+            ],
+          };
+
+          if (initialFunction) {
+            suggestedCondition.all!.push({
+              field: "function",
+              operator: "eq",
+              value: initialFunction,
+            });
+          }
+
+          setCondition(suggestedCondition);
+          setName(`规则 - ${initialFile || "行号"}:${initialLine}`);
+          setDescription(`自动生成的规则：针对 ${initialFile || ""}:${initialLine} ${initialFunction ? `(${initialFunction})` : ""}`);
+        }
+      } catch (err) {
+        setError("加载规则失败：" + (err as Error).message);
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRuleData();
+  }, [ruleId, initialLine, initialFile, initialFunction, initialPattern]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -587,22 +670,20 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
     try {
       setSaving(true);
 
-      if (rule) {
-        await apiClient.updateRule(rule.id, {
-          name,
-          description,
-          enabled,
-          condition,
-          actions,
-        });
+      const ruleData = {
+        name,
+        description,
+        enabled,
+        condition,
+        actions,
+        service,
+        component,
+      };
+
+      if (ruleId) {
+        await apiClient.updateRule(ruleId, ruleData);
       } else {
-        await apiClient.createRule({
-          name,
-          description,
-          enabled,
-          condition,
-          actions,
-        });
+        await apiClient.createRule(ruleData);
       }
 
       onSave();
@@ -620,9 +701,28 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
         <button onClick={onCancel} className="text-gray-600 hover:text-gray-900 mb-4">
           ← 返回列表
         </button>
-        <h2 className="text-2xl font-bold text-gray-900">
-          {rule ? "编辑规则" : "新建规则"}
-        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {ruleId ? "编辑规则" : "新建规则"}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {service} · {component === 'sdk' ? 'SDK' : 'Processor'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {initialLine && (
+              <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                基于行号 L{initialLine} 生成
+              </div>
+            )}
+            {initialPattern && (
+              <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                基于模式生成
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -631,7 +731,15 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">加载中...</p>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
         {/* 基本信息 */}
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">基本信息</h3>
@@ -707,6 +815,7 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }

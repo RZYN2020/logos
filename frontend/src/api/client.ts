@@ -2,8 +2,6 @@
 import type {
   ApiResponse,
   Rule,
-  SystemInfo,
-  HealthCheck,
 } from "./types";
 
 const API_BASE = "http://localhost:8080/api/v1";
@@ -11,9 +9,16 @@ const API_BASE = "http://localhost:8080/api/v1";
 export const apiClient = {
   // ============ 规则 API ============
 
-  // 获取所有规则
-  async listRules(): Promise<Rule[]> {
-    const res = await fetch(`${API_BASE}/rules`);
+  // 获取所有规则（可根据服务和组件过滤）
+  async listRules(service?: string, component?: 'sdk' | 'processor'): Promise<Rule[]> {
+    let url = `${API_BASE}/rules`;
+    const params = new URLSearchParams();
+    if (service) params.append('service', service);
+    if (component) params.append('component', component);
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+
+    const res = await fetch(url);
     const data: ApiResponse<Rule[] | { rules: Rule[] }> = await res.json();
     // 处理两种可能的响应格式：直接返回数组或 { rules: Rule[] }
     if (Array.isArray(data.data)) {
@@ -56,26 +61,5 @@ export const apiClient = {
     await fetch(`${API_BASE}/rules/${id}`, {
       method: "DELETE",
     });
-  },
-
-  // ============ 系统 API ============
-
-  // 获取系统信息
-  async getSystemInfo(): Promise<SystemInfo | null> {
-    const res = await fetch(`${API_BASE}/info`);
-    const data: ApiResponse<SystemInfo> = await res.json();
-    return data.data || null;
-  },
-
-  // 健康检查
-  async healthCheck(): Promise<HealthCheck | null> {
-    try {
-      const res = await fetch(`${API_BASE}/health`);
-      if (!res.ok) return null;
-      const data: ApiResponse<HealthCheck> = await res.json();
-      return data.data || null;
-    } catch {
-      return null;
-    }
   },
 };
