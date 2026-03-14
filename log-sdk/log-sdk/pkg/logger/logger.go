@@ -138,9 +138,9 @@ type LogEntry struct {
 	SpanID    string                 `json:"span_id,omitempty"`
 	Fields    map[string]interface{} `json:"fields,omitempty"`
 	// 内部字段（用于 Hook 过滤）
-	File      string                 `json:"-"`
-	Line      int                    `json:"-"`
-	Function  string                 `json:"-"`
+	File     string `json:"-"`
+	Line     int    `json:"-"`
+	Function string `json:"-"`
 }
 
 // Logger 日志接口
@@ -260,7 +260,7 @@ func New(cfg Config) Logger {
 	return &loggerImpl{
 		config:   cfg,
 		producer: producer,
-		rule: engine,
+		rule:     engine,
 		fields:   make([]Field, 0),
 		hooks:    make([]Hook, 0),
 	}
@@ -422,7 +422,7 @@ func (l *loggerImpl) With(fields ...Field) Logger {
 	newLogger := &loggerImpl{
 		config:   l.config,
 		producer: l.producer,
-		rule: l.rule,
+		rule:     l.rule,
 		fields:   append(l.fields, fields...),
 		hooks:    append([]Hook(nil), l.hooks...),
 	}
@@ -433,7 +433,7 @@ func (l *loggerImpl) AddHook(h Hook) Logger {
 	newLogger := &loggerImpl{
 		config:   l.config,
 		producer: l.producer,
-		rule: l.rule,
+		rule:     l.rule,
 		fields:   append([]Field(nil), l.fields...),
 		hooks:    append(append([]Hook(nil), l.hooks...), h),
 	}
