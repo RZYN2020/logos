@@ -36,15 +36,18 @@ export default function LogAnalyzer({ service }: LogAnalyzerProps) {
         limit: 100,
       });
 
-      const apiResults = (response.logs || []).map((log: Record<string, unknown>) => ({
-        timestamp: log.timestamp || new Date().toISOString(),
-        level: log.level || "INFO",
-        service: log.service || service,
-        message: log.message || "",
-        trace_id: log.trace_id || "",
-        user_id: log.user_id || "",
-        error_code: log.error_code || "",
-      }));
+      const apiResults = (response.logs || []).map((log: unknown) => {
+        const entry = log as Record<string, unknown>;
+        return {
+          timestamp: (entry.timestamp as string) || new Date().toISOString(),
+          level: (entry.level as string) || "INFO",
+          service: (entry.service as string) || service,
+          message: (entry.message as string) || "",
+          trace_id: (entry.trace_id as string) || "",
+          user_id: (entry.user_id as string) || "",
+          error_code: (entry.error_code as string) || "",
+        };
+      });
 
       setResults(apiResults);
     } catch (err) {
