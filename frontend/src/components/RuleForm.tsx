@@ -588,7 +588,7 @@ export default function RuleForm({
   const [actions, setActions] = useState<Action[]>([{ type: "drop" }]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(!!ruleId);
+  const [loading, setLoading] = useState(!!ruleId || !!initialLine || !!initialPattern);
 
   // 加载现有规则数据或根据行号/模式生成建议规则
   useEffect(() => {
