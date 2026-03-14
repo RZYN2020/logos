@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiClient } from "../api/client";
 import type { LogReport as LogReportType, LogPatternStat } from "../api/types";
 
 interface LogReportProps {
@@ -7,88 +8,28 @@ interface LogReportProps {
   onConfigureFromPattern: (pattern: string) => void;
 }
 
-// 模拟数据
-const MOCK_REPORT: LogReportType = {
-  service: "api-gateway",
-  total_logs: 125847,
-  time_range: {
-    from: "2024-01-21T00:00:00Z",
-    to: "2024-01-22T23:59:59Z"
-  },
-  top_lines: [
-    { line_number: 142, file: "handler.go", function: "handleRequest", count: 15234, percentage: 12.1 },
-    { line_number: 89, file: "middleware/auth.go", function: "ValidateToken", count: 12456, percentage: 9.9 },
-    { line_number: 256, file: "service/user.go", function: "GetUser", count: 9876, percentage: 7.8 },
-    { line_number: 34, file: "utils/logger.go", function: "Info", count: 8765, percentage: 7.0 },
-    { line_number: 178, file: "handler.go", function: "handleError", count: 7654, percentage: 6.1 },
-  ],
-  top_patterns: [
-    {
-      pattern: "Request received from {ip}",
-      count: 25000,
-      percentage: 19.9,
-      sample_logs: [
-        "Request received from 192.168.1.100",
-        "Request received from 10.0.0.50",
-        "Request received from 172.16.0.25"
-      ]
-    },
-    {
-      pattern: "User {user_id} authenticated successfully",
-      count: 18500,
-      percentage: 14.7,
-      sample_logs: [
-        "User 12345 authenticated successfully",
-        "User 67890 authenticated successfully"
-      ]
-    },
-    {
-      pattern: "Database query completed in {ms}ms",
-      count: 15200,
-      percentage: 12.1,
-      sample_logs: [
-        "Database query completed in 45ms",
-        "Database query completed in 120ms",
-        "Database query completed in 23ms"
-      ]
-    },
-    {
-      pattern: "Cache {action} for key {key}",
-      count: 12000,
-      percentage: 9.5,
-      sample_logs: [
-        "Cache hit for key user:12345",
-        "Cache miss for key session:abc123"
-      ]
-    },
-    {
-      pattern: "API response {status} in {ms}ms",
-      count: 10500,
-      percentage: 8.3,
-      sample_logs: [
-        "API response 200 in 89ms",
-        "API response 500 in 1250ms"
-      ]
-    },
-  ]
-};
-
 export default function LogReport({ service, onConfigureFromLine, onConfigureFromPattern }: LogReportProps) {
   const [report, setReport] = useState<LogReportType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPattern, setSelectedPattern] = useState<LogPatternStat | null>(null);
 
   useEffect(() => {
-    // 加载日志报告
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    // 暂时使用模拟数据
-    const timer = setTimeout(() => {
-      setReport({ ...MOCK_REPORT, service });
-      setLoading(false);
-    }, 500);
+    const loadReport = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await apiClient.getReport(service);
+        setReport(data);
+      } catch (err) {
+        console.error("Failed to load report:", err);
+        setError(err instanceof Error ? err.message : "Failed to load report");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => clearTimeout(timer);
+    loadReport();
   }, [service]);
 
   if (loading) {
@@ -102,6 +43,15 @@ export default function LogReport({ service, onConfigureFromLine, onConfigureFro
     );
   }
 
+  if (error) {
+    return (
+      <div className="text-center py-12 text-red-600">
+        <p className="font-medium">加载失败：{error}</p>
+        <p className="text-sm text-gray-500 mt-2">请确保后端服务正在运行</p>
+      </div>
+    );
+  }
+
   if (!report) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -109,6 +59,9 @@ export default function LogReport({ service, onConfigureFromLine, onConfigureFro
       </div>
     );
   }
+
+  // 计算时间范围（如果没有服务端返回的时间范围，则使用当前日期）
+  const timeRange = report.time_range || { from: new Date().toISOString(), to: new Date().toISOString() };
 
   return (
     <div className="space-y-6">
@@ -124,13 +77,13 @@ export default function LogReport({ service, onConfigureFromLine, onConfigureFro
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-lg font-bold text-green-600">
-              {report.time_range.from.slice(0, 10)}
+              {timeRange.from.slice(0, 10)}
             </div>
             <div className="text-sm text-gray-600 mt-1">开始时间</div>
           </div>
           <div className="text-center p-4 bg-purple-50 rounded-lg">
             <div className="text-lg font-bold text-purple-600">
-              {report.time_range.to.slice(0, 10)}
+              {timeRange.to.slice(0, 10)}
             </div>
             <div className="text-sm text-gray-600 mt-1">结束时间</div>
           </div>
