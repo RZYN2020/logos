@@ -4,6 +4,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -35,6 +36,8 @@ type RuleRequest struct {
 	Description string              `json:"description"`
 	Enabled     bool                `json:"enabled"`
 	Priority    int                 `json:"priority"`
+	Service     string              `json:"service"`
+	Component   string              `json:"component"` // sdk or processor
 	Conditions  []ConditionRequest  `json:"conditions"`
 	Actions     []ActionRequest     `json:"actions"`
 }
@@ -67,6 +70,8 @@ func (h *RuleHandler) CreateRule(c *gin.Context) {
 		Description: req.Description,
 		Enabled:     req.Enabled,
 		Priority:    req.Priority,
+		Service:     req.Service,
+		Component:   req.Component,
 		Version:     1,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -124,8 +129,19 @@ func (h *RuleHandler) GetRule(c *gin.Context) {
 
 // ListRules 获取规则列表
 func (h *RuleHandler) ListRules(c *gin.Context) {
+	service := c.Query("service")
+	component := c.Query("component")
+
+	query := h.db.Preload("Conditions").Preload("Actions")
+	if service != "" {
+		query = query.Where("service = ?", service)
+	}
+	if component != "" {
+		query = query.Where("component = ?", component)
+	}
+
 	var rules []models.Rule
-	if err := h.db.Preload("Conditions").Preload("Actions").Find(&rules).Error; err != nil {
+	if err := query.Find(&rules).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list rules"})
 		return
 	}
@@ -154,6 +170,8 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 	rule.Description = req.Description
 	rule.Enabled = req.Enabled
 	rule.Priority = req.Priority
+	rule.Service = req.Service
+	rule.Component = req.Component
 	rule.Version++
 	rule.UpdatedAt = time.Now()
 
@@ -410,9 +428,13 @@ func (h *RuleHandler) syncRuleToEtcd(rule *models.Rule) error {
 		return err
 	}
 
-	// 写入 ETCD - 使用统一规则的命名空间
-	// 格式：/rules/clients/{service_name}.{environment}/sdk/{ruleID}
-	// 这里使用 analyzer 作为默认服务
-	key := "/rules/clients/analyzer.default/sdk/" + rule.ID
+	// 写入 ETCD - 使用动态命名空间
+	// 格式：/rules/clients/{service}.{environment}/sdk/{ruleID}
+	// 如果规则没有 service 字段，使用默认值
+	service := rule.Service
+	if service == "" {
+		service = "analyzer"
+	}
+	key := fmt.Sprintf("/rules/clients/%s.default/sdk/%s", service, rule.ID)
 	return h.etcdCli.Put(ctx, key, string(data))
 }

@@ -18,6 +18,9 @@ type Rule struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description,omitempty"`
 	Enabled     bool        `json:"enabled"`
+	Priority    int         `json:"priority,omitempty"`
+	Service     string      `json:"service,omitempty"`
+	Component   string      `json:"component,omitempty"` // sdk or processor
 	Condition   Condition   `json:"condition"`
 	Actions     []ActionDef `json:"actions"`
 	CreatedAt   time.Time   `json:"created_at,omitempty"`

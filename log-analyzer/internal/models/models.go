@@ -39,8 +39,10 @@ type Rule struct {
 	ID          string                 `json:"id" gorm:"primaryKey"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description,omitempty"`
-	Enabled     bool                   `json:"enabled"`
-	Priority    int                    `json:"priority"`
+	Enabled     bool                   `json:"enabled" gorm:"default:true"`
+	Priority    int                    `json:"priority" gorm:"default:0"`
+	Service     string                 `json:"service,omitempty" gorm:"index"`
+	Component   string                 `json:"component,omitempty" gorm:"index"` // sdk or processor
 	Conditions  []Condition            `json:"conditions" gorm:"foreignKey:RuleID"`
 	Actions     []Action               `json:"actions" gorm:"foreignKey:RuleID"`
 	Version     int                    `json:"version"`
@@ -118,6 +120,36 @@ type LogCluster struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// LogEntry 日志存储模型
+type LogEntry struct {
+	ID        uint                   `gorm:"primaryKey"`
+	Service   string                 `gorm:"index;not null"`
+	Component string                 `gorm:"index"`
+	Timestamp time.Time              `gorm:"index"`
+	Level     string                 `gorm:"index"`
+	Message   string                 `gorm:"type:text"`
+	Path      string                 `gorm:"index"` // 日志所在文件路径
+	Function  string                 `gorm:"index"` // 日志所在函数
+	LineNumber int                   `gorm:"index"` // 日志行号
+	TraceID   string                 `gorm:"index"`
+	UserID    string
+	Fields    JSONMap `gorm:"type:text"` // 额外字段
+	CreatedAt time.Time
+}
+
+// LogReport 日志报告模型
+type LogReport struct {
+	Service     string    `gorm:"primaryKey"`
+	Component   string    `gorm:"primaryKey"`
+	From        time.Time `gorm:"index"`
+	To          time.Time
+	TotalLogs   int
+	TopLines    JSONMap `gorm:"type:text"` // 存储 TOP 行号统计
+	TopPatterns JSONMap `gorm:"type:text"` // 存储 TOP 模式统计
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 // ToUnifiedRule 将数据库规则转换为统一规则模型
 func (r *Rule) ToUnifiedRule() *unifiedRule.Rule {
 	// 构建复合条件
@@ -154,6 +186,9 @@ func (r *Rule) ToUnifiedRule() *unifiedRule.Rule {
 		Name:        r.Name,
 		Description: r.Description,
 		Enabled:     r.Enabled,
+		Priority:    r.Priority,
+		Service:     r.Service,
+		Component:   r.Component,
 		Condition:   compositeCondition,
 		Actions:     actions,
 		CreatedAt:   r.CreatedAt,

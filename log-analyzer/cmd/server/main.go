@@ -38,6 +38,7 @@ type Server struct {
 	etcdCli     *etcd.Client
 	ruleHandler *handlers.RuleHandler
 	analysisHandler *handlers.AnalysisHandler
+	reportHandler *handlers.ReportHandler
 	authHandler *handlers.AuthHandler
 	authConfig  *middleware.AuthConfig
 }
@@ -71,6 +72,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// 创建处理器
 	ruleHandler := handlers.NewRuleHandler(db, etcdCli)
 	analysisHandler := handlers.NewAnalysisHandler()
+	reportHandler := handlers.NewReportHandler(db)
 
 	s := &Server{
 		config:      cfg,
@@ -79,6 +81,7 @@ func NewServer(cfg Config) (*Server, error) {
 		etcdCli:     etcdCli,
 		ruleHandler: ruleHandler,
 		analysisHandler: analysisHandler,
+		reportHandler: reportHandler,
 		authHandler: authHandler,
 		authConfig:  authConfig,
 	}
@@ -146,6 +149,16 @@ func (s *Server) setupRoutes() {
 			auth.POST("/analysis/cluster", s.analysisHandler.ClusterLogs)
 			auth.POST("/analysis/recommend", s.analysisHandler.RecommendRules)
 			auth.GET("/analysis/pattern-types", s.analysisHandler.GetPatternTypes)
+
+			// 日志报告 API - 新增
+			auth.GET("/report/:service", s.reportHandler.GetReport)
+			auth.GET("/report/:service/top-lines", s.reportHandler.GetTopLines)
+			auth.GET("/report/:service/top-patterns", s.reportHandler.GetTopPatterns)
+
+			// 日志摄入 API - 新增
+			auth.POST("/logs", s.reportHandler.IngestLog)
+			auth.POST("/logs/batch", s.reportHandler.IngestBatch)
+			auth.POST("/logs/query", s.reportHandler.QueryLogs)
 		}
 	}
 }

@@ -17,5 +17,7 @@ func Migrate(db *gorm.DB) error {
 		&models.StrategyRule{},
 		&models.LogPattern{},
 		&models.LogCluster{},
+		&models.LogEntry{},
+		&models.LogReport{},
 	)
 }
