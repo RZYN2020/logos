@@ -130,30 +130,35 @@ func (dt *DrainTree) extractPattern(tokens []string) string {
 	return strings.Join(pattern, " ")
 }
 
+// 预编译正则表达式（性能优化）
+var (
+	regexDigit    = regexp.MustCompile(`^\d+$`)
+	regexUUID     = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
+	regexIP       = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
+	regexTimestamp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
+	regexHex      = regexp.MustCompile(`^[a-f0-9]{8,}$`)
+)
+
 // isVariable 判断是否为变量
 func isVariable(token string) bool {
 	// 数字
-	if regexp.MustCompile(`^\d+$`).MatchString(token) {
+	if regexDigit.MatchString(token) {
 		return true
 	}
 	// UUID
-	if regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`).MatchString(token) {
+	if regexUUID.MatchString(token) {
 		return true
 	}
 	// IP 地址
-	if regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`).MatchString(token) {
+	if regexIP.MatchString(token) {
 		return true
 	}
 	// 时间戳
-	if regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`).MatchString(token) {
+	if regexTimestamp.MatchString(token) {
 		return true
 	}
 	// Hex 字符串
-	if regexp.MustCompile(`^[a-f0-9]{8,}$`).MatchString(token) {
-		return true
-	}
-	// 纯数字
-	if regexp.MustCompile(`^\d+$`).MatchString(token) {
+	if regexHex.MatchString(token) {
 		return true
 	}
 	return false
