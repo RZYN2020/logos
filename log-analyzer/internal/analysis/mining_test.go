@@ -170,7 +170,7 @@ func TestExtractKeywords(t *testing.T) {
 	}{
 		{
 			name:     "with placeholders",
-			pattern:  "Error {num}: connection failed at {timestamp}",
+			pattern:  "Error <*>: connection failed at <*>",
 			expected: "Error : connection failed at",
 		},
 		{
