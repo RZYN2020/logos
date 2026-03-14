@@ -184,9 +184,17 @@ func (h *ReportHandler) GetReport(c *gin.Context) {
 
 	wg.Wait()
 
+	// 计算时间范围
+	now := time.Now()
+	timeRange := gin.H{
+		"from": now.Add(-24 * time.Hour).Format(time.RFC3339),
+		"to":   now.Format(time.RFC3339),
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"service":      service,
 		"total_logs":   topLinesResult["total_logs"],
+		"time_range":   timeRange,
 		"top_lines":    topLinesResult["top_lines"],
 		"top_patterns": topPatternsResult["top_patterns"],
 	})
