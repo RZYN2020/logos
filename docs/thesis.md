@@ -16,7 +16,7 @@
 1. **主论点1**: 应用侧动态配置过滤裁剪策略 Etcd，可以在字符串构建前对日志进行过滤
 2. **主论点2**: 语义化日志，可SQL查询，可链路分析
 3. **主论点3**: 日志分析
-   1. 日志模式解析 https://zhuanlan.zhihu.com/p/498522888
+   1. 日志模式解析 - 基于 **Drain 算法**实现日志模板自动发现
    2. 使用 SQL api 查询，语义化分析
    3. 使用上面能力，生成日志报告，一键跳转规则配置
 4. **从论点**: 高性能（如 Zap, Zerolog）
@@ -189,9 +189,51 @@ Grafana 是一个开源的度量分析与可视化套件：
 
 Drain 是一种在线日志解析算法，具有以下特点：
 
-- **固定深度解析树**：高效的模板匹配结构
+- **固定深度解析树**：高效的模板匹配结构，基于树形结构实现快速查找
+- **变量检测**：自动识别数字、UUID、IP 地址、时间戳、Hex 字符串等变量
 - **相似度计算**：基于 token 匹配的日志分组
 - **增量学习**：支持新日志模板的自动发现
+- **在线处理**：无需预先训练，实时处理日志流
+
+### Drain 算法在本系统中的应用
+
+本系统在 `log-analyzer/internal/analysis/mining.go` 中实现了 Drain 算法，用于：
+
+1. **TOP 模式统计**：识别高频日志模板，生成 `/api/v1/report/:service/top-patterns` 接口
+2. **异常检测**：对比基线模式和当前模式，发现新出现的错误模式
+3. **日志聚类**：将相同模式的日志聚合，减少分析复杂度
+4. **规则推荐**：基于高频模式自动生成日志过滤规则建议
+
+### Drain 算法实现细节
+
+```go
+// DrainTree Drain 算法树
+type DrainTree struct {
+    root       *DrainNode
+    templates  map[string]*LogPattern // 模板 ID -> LogPattern
+    maxDepth   int                    // 树最大深度（默认 4）
+    similarity float64                // 相似度阈值（默认 0.8）
+    mu         sync.RWMutex           // 线程安全
+}
+
+// DrainNode Drain 算法树节点
+type DrainNode struct {
+    Children   map[string]*DrainNode // 子节点映射
+    PatternIDs []string              // 此节点的模板 ID 列表
+    Depth      int                   // 节点深度
+    Template   string                // 日志模板
+}
+```
+
+### 占位符格式
+
+Drain 算法使用 `<*>` 作为变量占位符：
+
+| 原始日志 | 解析模式 |
+|---------|---------|
+| `Error 123: connection failed` | `Error <*>: connection failed` |
+| `User abc-123 logged in` | `User <*> logged in` |
+| `Request from 192.168.1.1` | `Request from <*>` |
 
 ### 其他相关算法
 
@@ -917,17 +959,27 @@ Kafka Consumer → Parser → Semantic Builder → Sink → Elasticsearch
 
 #### 统一后端架构
 
-Log Analyzer 作为统一后端，提供两套 API：
+Log Analyzer 作为统一后端，提供三套 API：
 
 1. **日志查询 API**：
    - `GET /api/v1/logs`：简单查询
    - `POST /api/v1/logs/sql`：SQL 查询
+   - `POST /api/v1/logs/query`：高级查询（支持服务/组件/时间范围过滤）
 
 2. **策略配置 API**：
-   - `GET /api/v1/strategies`：获取策略列表
-   - `POST /api/v1/strategies`：创建策略
-   - `PUT /api/v1/strategies/{id}`：更新策略
-   - `DELETE /api/v1/strategies/{id}`：删除策略
+   - `GET /api/v1/rules`：获取策略列表（支持 service/component 过滤）
+   - `POST /api/v1/rules`：创建策略
+   - `PUT /api/v1/rules/:id`：更新策略
+   - `DELETE /api/v1/rules/:id`：删除策略
+
+3. **日志报告 API**（新增）：
+   - `GET /api/v1/report/:service`：获取完整日志报告
+   - `GET /api/v1/report/:service/top-lines`：TOP 行号统计
+   - `GET /api/v1/report/:service/top-patterns`：TOP 模式识别（基于 Drain 算法）
+
+4. **日志摄入 API**（新增）：
+   - `POST /api/v1/logs`：单条日志摄入
+   - `POST /api/v1/logs/batch`：批量日志摄入
 
 #### SQL 查询引擎
 
@@ -961,9 +1013,134 @@ LIMIT 100
 
 自动报告器功能：
 - 日志模式识别（Drain 算法）
-- Top N 日志统计
-- 异常检测
-- 优化建议生成
+- Top N 日志统计（按行号、模式分组）
+- 异常检测（对比基线模式）
+- 优化建议生成（基于频率和严重性）
+
+**数据模型**：
+
+```go
+// LogEntry 日志存储模型
+type LogEntry struct {
+    ID        uint      `gorm:"primaryKey"`
+    Service   string    `gorm:"index;not null"`  // 所属服务
+    Component string    `gorm:"index"`           // 组件类型：sdk/processor
+    Timestamp time.Time `gorm:"index"`
+    Level     string    `gorm:"index"`
+    Message   string    `gorm:"type:text"`
+    Path      string    `gorm:"index"`           // 日志所在文件路径
+    Function  string    `gorm:"index"`           // 日志所在函数
+    LineNumber int      `gorm:"index"`           // 日志行号
+    TraceID   string    `gorm:"index"`
+    UserID    string
+    Fields    JSONMap   `gorm:"type:text"`       // 额外字段
+    CreatedAt time.Time
+}
+
+// LogReport 日志报告模型
+type LogReport struct {
+    Service     string    `gorm:"primaryKey"`
+    Component   string    `gorm:"primaryKey"`
+    From        time.Time `gorm:"index"`
+    To          time.Time
+    TotalLogs   int
+    TopLines    JSONMap   `gorm:"type:text"`  // 存储 TOP 行号统计
+    TopPatterns JSONMap   `gorm:"type:text"`  // 存储 TOP 模式统计
+    CreatedAt   time.Time
+    UpdatedAt   time.Time
+}
+```
+
+**TOP 行号统计**：
+
+按文件路径、函数、行号分组统计日志频率：
+
+```sql
+SELECT path, function, line_number, COUNT(*) as count
+FROM log_entries
+WHERE service = 'api-gateway'
+GROUP BY path, function, line_number
+ORDER BY count DESC
+LIMIT 10
+```
+
+返回示例：
+
+```json
+{
+  "service": "api-gateway",
+  "total_logs": 125847,
+  "top_lines": [
+    {
+      "line_number": 142,
+      "file": "pkg/handler/user.go",
+      "function": "GetUser",
+      "count": 25000,
+      "percentage": 19.9
+    }
+  ]
+}
+```
+
+**TOP 模式识别**：
+
+基于 Drain 算法识别高频日志模板：
+
+```go
+// GetTopPatterns 获取 TOP 日志模式统计
+func (h *ReportHandler) GetTopPatterns(c *gin.Context) {
+    service := c.Param("service")
+
+    // 获取日志
+    var logs []models.LogEntry
+    h.db.Where("service = ?", service).Find(&logs)
+
+    // 使用 PatternMiner 进行模式识别（Drain 算法）
+    miner := analysis.NewPatternMiner()
+    entries := make([]analysis.LogEntry, len(logs))
+    for i, log := range logs {
+        entries[i] = analysis.LogEntry{
+            Message:   log.Message,
+            Timestamp: log.Timestamp,
+            Level:     log.Level,
+        }
+    }
+
+    patterns := miner.AnalyzePatterns(entries)
+
+    // 排序并取 TOP N
+    sort.Slice(patterns, func(i, j int) bool {
+        return patterns[i].Frequency > patterns[j].Frequency
+    })
+
+    // 返回结果
+    c.JSON(http.StatusOK, gin.H{
+        "service":      service,
+        "total_logs":   total,
+        "top_patterns": topPatterns,
+    })
+}
+```
+
+返回示例：
+
+```json
+{
+  "service": "api-gateway",
+  "total_logs": 125847,
+  "top_patterns": [
+    {
+      "pattern": "Request received from <*>",
+      "count": 25000,
+      "percentage": 19.9,
+      "sample_logs": [
+        "Request received from 192.168.1.100",
+        "Request received from 10.0.0.50"
+      ]
+    }
+  ]
+}
+```
 
 ### 3.4.4 Frontend 设计
 
@@ -1404,28 +1581,215 @@ func (s *ElasticsearchSink) flush() {
 #### Gin 路由配置
 
 ```go
-func main() {
-    r := gin.Default()
+func (s *Server) setupRoutes() {
+    // API v1 路由组
+    v1 := s.engine.Group("/api/v1")
+    {
+        // 系统信息
+        v1.GET("/info", s.systemInfoHandler)
 
-    // 日志查询 API
-    r.GET("/api/v1/logs", queryLogs)
-    r.POST("/api/v1/logs/sql", queryLogsBySQL)
+        // 日志查询 API
+        v1.POST("/query", s.queryHandler)
+        v1.GET("/search", s.searchHandler)
+        v1.POST("/aggregate", s.aggregateHandler)
 
-    // 策略配置 API
-    r.GET("/api/v1/strategies", listStrategies)
-    r.POST("/api/v1/strategies", createStrategy)
-    r.GET("/api/v1/strategies/:id", getStrategy)
-    r.PUT("/api/v1/strategies/:id", updateStrategy)
-    r.DELETE("/api/v1/strategies/:id", deleteStrategy)
+        // 认证 API (公开)
+        v1.POST("/auth/login", s.authHandler.Login)
+        v1.POST("/auth/register", s.authHandler.Register)
 
-    // 健康检查
-    r.GET("/api/v1/health", healthCheck)
+        // 认证 API (需要认证)
+        auth := v1.Group("")
+        auth.Use(s.authConfig.AuthMiddleware())
+        {
+            // 用户管理
+            auth.GET("/user", s.authHandler.GetCurrentUser)
+            auth.PUT("/user/password", s.authHandler.ChangePassword)
+            auth.GET("/users", s.authHandler.ListUsers)
 
-    r.Run(":8080")
+            // 规则管理 API
+            auth.GET("/rules", s.ruleHandler.ListRules)
+            auth.POST("/rules", s.ruleHandler.CreateRule)
+            auth.GET("/rules/:id", s.ruleHandler.GetRule)
+            auth.PUT("/rules/:id", s.ruleHandler.UpdateRule)
+            auth.DELETE("/rules/:id", s.ruleHandler.DeleteRule)
+
+            // 日志分析 API
+            auth.POST("/analysis/mine", s.analysisHandler.MinePatterns)
+            auth.POST("/analysis/anomalies", s.analysisHandler.DetectAnomalies)
+            auth.POST("/analysis/cluster", s.analysisHandler.ClusterLogs)
+            auth.POST("/analysis/recommend", s.analysisHandler.RecommendRules)
+
+            // 日志报告 API - 新增
+            auth.GET("/report/:service", s.reportHandler.GetReport)
+            auth.GET("/report/:service/top-lines", s.reportHandler.GetTopLines)
+            auth.GET("/report/:service/top-patterns", s.reportHandler.GetTopPatterns)
+
+            // 日志摄入 API - 新增
+            auth.POST("/logs", s.reportHandler.IngestLog)
+            auth.POST("/logs/batch", s.reportHandler.IngestBatch)
+            auth.POST("/logs/query", s.reportHandler.QueryLogs)
+        }
+    }
 }
 ```
 
-### 4.3.2 SQL 查询引擎的实现
+### 4.3.2 基于服务的服务报告架构
+
+#### 数据模型
+
+为支持基于服务的日志报告，新增以下数据模型：
+
+```go
+// LogEntry 日志存储模型
+type LogEntry struct {
+    ID         uint      `gorm:"primaryKey"`
+    Service    string    `gorm:"index;not null"`  // 所属服务
+    Component  string    `gorm:"index"`           // sdk 或 processor
+    Timestamp  time.Time `gorm:"index"`
+    Level      string    `gorm:"index"`
+    Message    string    `gorm:"type:text"`
+    Path       string    `gorm:"index"`           // 日志所在文件路径
+    Function   string    `gorm:"index"`           // 日志所在函数
+    LineNumber int       `gorm:"index"`           // 日志行号
+    TraceID    string    `gorm:"index"`
+    UserID     string
+    Fields     JSONMap   `gorm:"type:text"`
+    CreatedAt  time.Time
+}
+```
+
+#### 服务隔离设计
+
+每个服务（如 `api-gateway`、`user-service`）的日志独立存储和统计：
+
+1. **服务发现**：从 `LogEntry` 表中按 `service` 字段分组获取服务列表
+2. **组件过滤**：支持按 `component` (sdk/processor) 过滤
+3. **时间范围**：支持按时间范围查询日志
+
+#### 日志摄入 API
+
+```go
+// IngestLog 摄入单条日志
+func (h *ReportHandler) IngestLog(c *gin.Context) {
+    var req IngestLogRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    entry := models.LogEntry{
+        Service:    req.Service,
+        Component:  req.Component,
+        Timestamp:  time.Now(),
+        Level:      req.Level,
+        Message:    req.Message,
+        Path:       req.Path,
+        Function:   req.Function,
+        LineNumber: req.LineNumber,
+        TraceID:    req.TraceID,
+        UserID:     req.UserID,
+        Fields:     req.Fields,
+    }
+
+    h.db.Create(&entry)
+    c.JSON(http.StatusCreated, gin.H{"id": entry.ID})
+}
+
+// IngestBatch 批量摄入日志
+func (h *ReportHandler) IngestBatch(c *gin.Context) {
+    var req BatchIngestRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    entries := make([]models.LogEntry, len(req.Logs))
+    for i, log := range req.Logs {
+        entries[i] = models.LogEntry{
+            Service:    log.Service,
+            Component:  log.Component,
+            Timestamp:  time.Now(),
+            Level:      log.Level,
+            Message:    log.Message,
+            Path:       log.Path,
+            Function:   log.Function,
+            LineNumber: log.LineNumber,
+            TraceID:    log.TraceID,
+            UserID:     log.UserID,
+            Fields:     log.Fields,
+        }
+    }
+
+    // 批量插入（每批 1000 条）
+    h.db.CreateInBatches(&entries, 1000)
+    c.JSON(http.StatusCreated, gin.H{"ingested": len(entries)})
+}
+```
+
+### 4.3.3 TOP 行号接口实现
+
+#### GetTopLines 获取 TOP 日志行号统计
+
+```go
+// GetTopLines 获取 TOP 日志行号统计
+func (h *ReportHandler) GetTopLines(c *gin.Context) {
+    service := c.Param("service")
+    component := c.Query("component")
+    from := c.Query("from")
+    to := c.Query("to")
+    limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+    // 构建查询
+    query := h.db.Model(&models.LogEntry{}).
+        Select("path, function, line_number, COUNT(*) as count").
+        Where("service = ?", service)
+
+    if component != "" {
+        query = query.Where("component = ?", component)
+    }
+    if from != "" {
+        query = query.Where("timestamp >= ?", from)
+    }
+    if to != "" {
+        query = query.Where("timestamp <= ?", to)
+    }
+
+    var results []struct {
+        Path       string
+        Function   string
+        LineNumber int
+        Count      int
+    }
+
+    query.Group("path, function, line_number").
+        Order("count DESC").
+        Limit(limit).
+        Scan(&results)
+
+    // 计算总数和百分比
+    var total int64
+    h.db.Model(&models.LogEntry{}).Where("service = ?", service).Count(&total)
+
+    topLines := make([]gin.H, len(results))
+    for i, r := range results {
+        topLines[i] = gin.H{
+            "line_number": r.LineNumber,
+            "file":        r.Path,
+            "function":    r.Function,
+            "count":       r.Count,
+            "percentage":  float64(r.Count) / float64(total) * 100,
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "service":     service,
+        "total_logs":  total,
+        "top_lines":   topLines,
+    })
+}
+```
+
+### 4.3.4 SQL 查询引擎的实现
 
 #### SQL 解析
 
