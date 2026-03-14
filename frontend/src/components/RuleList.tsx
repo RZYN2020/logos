@@ -33,13 +33,14 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
     try {
       await apiClient.deleteRule(id);
       await loadRules();
-    } catch (err) {
+    } catch {
       setError("删除失败");
     }
   };
 
   useEffect(() => {
     loadRules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service, component]);
 
   if (loading) {

@@ -80,12 +80,15 @@ export default function LogReport({ service, onConfigureFromLine, onConfigureFro
 
   useEffect(() => {
     // 加载日志报告
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     // 暂时使用模拟数据
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setReport({ ...MOCK_REPORT, service });
       setLoading(false);
     }, 500);
+
+    return () => clearTimeout(timer);
   }, [service]);
 
   if (loading) {

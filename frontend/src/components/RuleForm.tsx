@@ -524,7 +524,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                   value={String(action.config?.value || '')}
                   onChange={(e) => {
                     const val = e.target.value;
-                    let parsed: any = val;
+                    let parsed: string | boolean | number = val;
                     if (val === 'true') parsed = true;
                     else if (val === 'false') parsed = false;
                     else if (!isNaN(Number(val))) parsed = Number(val);

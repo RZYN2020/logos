@@ -58,3 +58,4 @@ temp/
 
 # Data directories
 data/
+.claude/scheduled_tasks.lock

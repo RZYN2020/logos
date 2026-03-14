@@ -4,9 +4,19 @@ interface LogAnalyzerProps {
   service: string;
 }
 
+interface LogEntry {
+  timestamp: string;
+  level: string;
+  service: string;
+  message: string;
+  trace_id: string;
+  user_id: string;
+  error_code?: string;
+}
+
 export default function LogAnalyzer({ service }: LogAnalyzerProps) {
   const [query, setQuery] = useState<string>("SELECT * FROM logs WHERE service = 'api-gateway' LIMIT 100");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
