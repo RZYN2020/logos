@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Rule, Condition, Action, ConditionOperator } from "../api/types";
+import type { Rule, Condition, Action, ConditionOperator, ActionType } from "../api/types";
 import { apiClient } from "../api/client";
 
 interface Props {
@@ -10,37 +10,567 @@ interface Props {
 
 // 操作符选项
 const OPERATOR_OPTIONS: { value: ConditionOperator; label: string }[] = [
-  { value: 'eq', label: '等于 (eq)' },
-  { value: 'ne', label: '不等于 (ne)' },
-  { value: 'gt', label: '大于 (gt)' },
-  { value: 'lt', label: '小于 (lt)' },
-  { value: 'ge', label: '大于等于 (ge)' },
-  { value: 'le', label: '小于等于 (le)' },
-  { value: 'contains', label: '包含 (contains)' },
-  { value: 'starts_with', label: '开始于 (starts_with)' },
-  { value: 'ends_with', label: '结束于 (ends_with)' },
-  { value: 'matches', label: '正则匹配 (matches)' },
-  { value: 'in', label: '在集合中 (in)' },
-  { value: 'not_in', label: '不在集合中 (not_in)' },
-  { value: 'exists', label: '字段存在 (exists)' },
-  { value: 'not_exists', label: '字段不存在 (not_exists)' },
+  { value: 'eq', label: '等于' },
+  { value: 'ne', label: '不等于' },
+  { value: 'gt', label: '大于' },
+  { value: 'lt', label: '小于' },
+  { value: 'ge', label: '大于等于' },
+  { value: 'le', label: '小于等于' },
+  { value: 'contains', label: '包含' },
+  { value: 'starts_with', label: '开始于' },
+  { value: 'ends_with', label: '结束于' },
+  { value: 'matches', label: '正则匹配' },
+  { value: 'in', label: '在集合中' },
+  { value: 'not_in', label: '不在集合中' },
+  { value: 'exists', label: '字段存在' },
+  { value: 'not_exists', label: '字段不存在' },
 ];
+
+// 动作类型选项
+const ACTION_TYPE_OPTIONS: { value: ActionType; label: string; description: string }[] = [
+  { value: 'keep', label: '保留并终止', description: '保留日志并停止处理' },
+  { value: 'drop', label: '丢弃并终止', description: '丢弃日志并停止处理' },
+  { value: 'sample', label: '采样', description: '按比例采样日志' },
+  { value: 'mask', label: '掩码', description: '掩码敏感数据' },
+  { value: 'truncate', label: '截断', description: '截断字段值' },
+  { value: 'extract', label: '提取', description: '提取子串到新字段' },
+  { value: 'rename', label: '重命名', description: '重命名字段' },
+  { value: 'remove', label: '删除', description: '删除字段' },
+  { value: 'set', label: '设置', description: '设置字段值' },
+  { value: 'mark', label: '标记', description: '添加标记' },
+];
+
+// 字段选项
+const FIELD_OPTIONS = [
+  { value: 'level', label: '日志级别 (level)' },
+  { value: 'service', label: '服务名 (service)' },
+  { value: 'environment', label: '环境 (environment)' },
+  { value: 'cluster', label: '集群 (cluster)' },
+  { value: 'pod', label: 'Pod (pod)' },
+  { value: 'path', label: '路径 (path)' },
+  { value: 'message', label: '消息 (message)' },
+  { value: 'trace_id', label: '追踪 ID (trace_id)' },
+];
+
+// 单条件组件
+interface SingleConditionProps {
+  condition: Condition;
+  onChange: (condition: Condition) => void;
+  onRemove?: () => void;
+  canRemove?: boolean;
+}
+
+function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleConditionProps) {
+  const field = condition.field || 'level';
+  const operator = condition.operator || 'eq';
+  const value = condition.value ?? '';
+
+  return (
+    <div className="flex items-end gap-2 p-3 bg-gray-50 rounded-md">
+      <div className="flex-1">
+        <label className="block text-xs text-gray-500 mb-1">字段</label>
+        <select
+          value={field}
+          onChange={(e) => onChange({ ...condition, field: e.target.value })}
+          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+        >
+          {FIELD_OPTIONS.map(f => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+          <option value="custom">自定义字段...</option>
+        </select>
+        {field === 'custom' && (
+          <input
+            type="text"
+            placeholder="输入字段名"
+            onChange={(e) => onChange({ ...condition, field: e.target.value })}
+            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+          />
+        )}
+      </div>
+      <div className="flex-1">
+        <label className="block text-xs text-gray-500 mb-1">操作符</label>
+        <select
+          value={operator}
+          onChange={(e) => onChange({ ...condition, operator: e.target.value as ConditionOperator })}
+          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+        >
+          {OPERATOR_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex-1">
+        <label className="block text-xs text-gray-500 mb-1">值</label>
+        <input
+          type="text"
+          value={typeof value === 'string' ? value : JSON.stringify(value)}
+          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+          placeholder="输入值"
+          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+          disabled={operator === 'exists' || operator === 'not_exists'}
+        />
+      </div>
+      {canRemove && onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-md"
+        >
+          删除
+        </button>
+      )}
+    </div>
+  );
+}
+
+// 复合条件组件
+interface CompositeConditionProps {
+  type: 'all' | 'any' | 'not';
+  condition: Condition;
+  onChange: (condition: Condition) => void;
+  onRemove?: () => void;
+  canRemove?: boolean;
+}
+
+function CompositeCondition({ type, condition, onChange, onRemove, canRemove }: CompositeConditionProps) {
+  const conditions = type === 'not'
+    ? (condition.not ? [condition.not] : [])
+    : (type === 'all' ? condition.all : condition.any) || [];
+
+  const addCondition = () => {
+    const newCondition = { field: 'level', operator: 'eq' as ConditionOperator, value: 'ERROR' };
+    const updated = type === 'not'
+      ? { not: newCondition }
+      : { [type]: [...conditions, newCondition] };
+    onChange(updated);
+  };
+
+  const updateCondition = (index: number, updated: Condition) => {
+    if (type === 'not') {
+      onChange({ not: updated });
+    } else {
+      const newConditions = [...conditions];
+      newConditions[index] = updated;
+      onChange({ [type]: newConditions });
+    }
+  };
+
+  const removeCondition = (index: number) => {
+    if (type === 'not') {
+      onChange({});
+    } else {
+      const newConditions = conditions.filter((_, i) => i !== index);
+      onChange({ [type]: newConditions });
+    }
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-sm font-medium px-2 py-1 rounded ${
+          type === 'all' ? 'bg-blue-100 text-blue-800' :
+          type === 'any' ? 'bg-green-100 text-green-800' :
+          'bg-red-100 text-red-800'
+        }`}>
+          {type === 'all' ? 'AND (且)' : type === 'any' ? 'OR (或)' : 'NOT (非)'}
+        </span>
+        {canRemove && onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-600 hover:text-red-800"
+          >
+            删除条件组
+          </button>
+        )}
+      </div>
+      <div className="space-y-2">
+        {conditions.map((cond, index) => (
+          <SingleCondition
+            key={index}
+            condition={cond}
+            onChange={(updated) => updateCondition(index, updated)}
+            onRemove={() => removeCondition(index)}
+            canRemove
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addCondition}
+        className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+      >
+        + 添加条件
+      </button>
+    </div>
+  );
+}
+
+// 条件选择器组件
+interface ConditionBuilderProps {
+  condition: Condition;
+  onChange: (condition: Condition) => void;
+}
+
+function ConditionBuilder({ condition, onChange }: ConditionBuilderProps) {
+  const getConditionType = (): 'single' | 'all' | 'any' | 'not' => {
+    if (condition.all && condition.all.length > 0) return 'all';
+    if (condition.any && condition.any.length > 0) return 'any';
+    if (condition.not) return 'not';
+    return 'single';
+  };
+
+  const type = getConditionType();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 mb-3">
+        <button
+          type="button"
+          onClick={() => onChange({ field: 'level', operator: 'eq', value: 'ERROR' })}
+          className={`px-3 py-1 text-sm rounded ${
+            type === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          单条件
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ all: [{ field: 'level', operator: 'eq', value: 'ERROR' }] })}
+          className={`px-3 py-1 text-sm rounded ${
+            type === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          AND 且
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ any: [{ field: 'level', operator: 'eq', value: 'ERROR' }] })}
+          className={`px-3 py-1 text-sm rounded ${
+            type === 'any' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          OR 或
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ not: { field: 'level', operator: 'eq', value: 'ERROR' } })}
+          className={`px-3 py-1 text-sm rounded ${
+            type === 'not' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          NOT 非
+        </button>
+      </div>
+
+      {type === 'single' && (
+        <SingleCondition condition={condition} onChange={onChange} />
+      )}
+      {type === 'all' && (
+        <CompositeCondition type="all" condition={condition} onChange={onChange} />
+      )}
+      {type === 'any' && (
+        <CompositeCondition type="any" condition={condition} onChange={onChange} />
+      )}
+      {type === 'not' && (
+        <CompositeCondition type="not" condition={condition} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+// 动作配置组件
+interface ActionEditorProps {
+  actions: Action[];
+  onChange: (actions: Action[]) => void;
+}
+
+function ActionEditor({ actions, onChange }: ActionEditorProps) {
+  const addAction = () => {
+    onChange([...actions, { type: 'drop' }]);
+  };
+
+  const updateAction = (index: number, action: Action) => {
+    const newActions = [...actions];
+    newActions[index] = action;
+    onChange(newActions);
+  };
+
+  const removeAction = (index: number) => {
+    onChange(actions.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3">
+      {actions.map((action, index) => (
+        <div key={index} className="border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">动作 #{index + 1}</span>
+            {actions.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeAction(index)}
+                className="text-xs text-red-600 hover:text-red-800"
+              >
+                删除
+              </button>
+            )}
+          </div>
+
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">动作类型</label>
+            <select
+              value={action.type}
+              onChange={(e) => {
+                const newType = e.target.value as ActionType;
+                let newConfig = undefined;
+                if (newType === 'sample') {
+                  newConfig = { rate: 0.1 };
+                } else if (newType === 'mask') {
+                  newConfig = { field: 'password' };
+                } else if (newType === 'set') {
+                  newConfig = { field: 'processed', value: true };
+                }
+                updateAction(index, { type: newType, config: newConfig });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              {ACTION_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label} - {opt.description}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 根据动作类型显示不同配置 */}
+          {action.type === 'sample' && (
+            <div className="mb-2">
+              <label className="block text-xs text-gray-500 mb-1">采样率 (0.0-1.0)</label>
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                value={action.config?.rate || 0.1}
+                onChange={(e) => updateAction(index, {
+                  ...action,
+                  config: { ...action.config, rate: parseFloat(e.target.value) }
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+              />
+            </div>
+          )}
+
+          {action.type === 'mask' && (
+            <>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">要掩码的字段</label>
+                <input
+                  type="text"
+                  value={action.config?.field || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, field: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  placeholder="例如：password"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">掩码模式 (可选)</label>
+                <input
+                  type="text"
+                  value={action.config?.pattern || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, pattern: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  placeholder="例如：\d+"
+                />
+              </div>
+            </>
+          )}
+
+          {action.type === 'truncate' && (
+            <>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">要截断的字段</label>
+                <input
+                  type="text"
+                  value={action.config?.field || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, field: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">最大长度</label>
+                <input
+                  type="number"
+                  value={action.config?.max_length || 100}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, max_length: parseInt(e.target.value) }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {action.type === 'extract' && (
+            <>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">源字段</label>
+                <input
+                  type="text"
+                  value={action.config?.source_field || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, source_field: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">目标字段</label>
+                <input
+                  type="text"
+                  value={action.config?.target_field || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, target_field: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {action.type === 'rename' && (
+            <>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">原字段名</label>
+                <input
+                  type="text"
+                  value={action.config?.from || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, from: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">新字段名</label>
+                <input
+                  type="text"
+                  value={action.config?.to || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, to: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {action.type === 'remove' && (
+            <div className="mb-2">
+              <label className="block text-xs text-gray-500 mb-1">要删除的字段 (逗号分隔)</label>
+              <input
+                type="text"
+                value={(action.config?.fields || []).join(', ')}
+                onChange={(e) => updateAction(index, {
+                  ...action,
+                  config: { fields: e.target.value.split(',').map(s => s.trim()) }
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                placeholder="例如：field1, field2"
+              />
+            </div>
+          )}
+
+          {action.type === 'set' && (
+            <>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">字段名</label>
+                <input
+                  type="text"
+                  value={action.config?.field || ''}
+                  onChange={(e) => updateAction(index, {
+                    ...action,
+                    config: { ...action.config, field: e.target.value }
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="mb-2">
+                <label className="block text-xs text-gray-500 mb-1">字段值</label>
+                <input
+                  type="text"
+                  value={String(action.config?.value || '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    let parsed: any = val;
+                    if (val === 'true') parsed = true;
+                    else if (val === 'false') parsed = false;
+                    else if (!isNaN(Number(val))) parsed = Number(val);
+                    updateAction(index, {
+                      ...action,
+                      config: { ...action.config, value: parsed }
+                    });
+                  }}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          {action.type === 'mark' && (
+            <div className="mb-2">
+              <label className="block text-xs text-gray-500 mb-1">标记原因</label>
+              <input
+                type="text"
+                value={action.config?.reason || ''}
+                onChange={(e) => updateAction(index, {
+                  ...action,
+                  config: { ...action.config, reason: e.target.value }
+                })}
+                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                placeholder="例如：匹配规则 #123"
+              />
+            </div>
+          )}
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={addAction}
+        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500"
+      >
+        + 添加动作
+      </button>
+    </div>
+  );
+}
 
 export default function RuleForm({ rule, onSave, onCancel }: Props) {
   const [name, setName] = useState(rule?.name || "");
   const [description, setDescription] = useState(rule?.description || "");
   const [enabled, setEnabled] = useState(rule?.enabled ?? true);
-  const [conditionJson, setConditionJson] = useState<string>(
-    rule?.condition ? JSON.stringify(rule.condition, null, 2) : JSON.stringify({
-      field: "level",
-      operator: "eq",
-      value: "ERROR"
-    }, null, 2)
+  const [condition, setCondition] = useState<Condition>(
+    rule?.condition || { field: "level", operator: "eq", value: "ERROR" }
   );
-  const [actionsJson, setActionsJson] = useState<string>(
-    rule?.actions ? JSON.stringify(rule.actions, null, 2) : JSON.stringify([{
-      type: "drop"
-    }], null, 2)
+  const [actions, setActions] = useState<Action[]>(
+    rule?.actions || [{ type: "drop" }]
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -57,39 +587,21 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
     try {
       setSaving(true);
 
-      let parsedCondition: Condition;
-      try {
-        parsedCondition = JSON.parse(conditionJson);
-      } catch (err) {
-        setError("条件 JSON 格式错误：" + (err as Error).message);
-        setSaving(false);
-        return;
-      }
-
-      let parsedActions: Action[];
-      try {
-        parsedActions = JSON.parse(actionsJson);
-      } catch (err) {
-        setError("动作 JSON 格式错误：" + (err as Error).message);
-        setSaving(false);
-        return;
-      }
-
       if (rule) {
         await apiClient.updateRule(rule.id, {
           name,
           description,
           enabled,
-          condition: parsedCondition,
-          actions: parsedActions,
+          condition,
+          actions,
         });
       } else {
         await apiClient.createRule({
           name,
           description,
           enabled,
-          condition: parsedCondition,
-          actions: parsedActions,
+          condition,
+          actions,
         });
       }
 
@@ -99,14 +611,6 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
       console.error(err);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const loadTemplate = (type: 'condition' | 'action', template: string) => {
-    if (type === 'condition') {
-      setConditionJson(template);
-    } else {
-      setActionsJson(template);
     }
   };
 
@@ -129,215 +633,64 @@ export default function RuleForm({ rule, onSave, onCancel }: Props) {
 
       <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
         {/* 基本信息 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">基本信息</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                规则名称
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="例如：drop-debug-logs"
+                required
+              />
+            </div>
+
+            <div className="flex items-end">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                  className="mr-2 h-4 w-4"
+                />
+                <span className="text-sm font-medium text-gray-700">启用规则</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              规则名称
+              规则描述
             </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="例如：drop-debug-logs"
-              required
+              rows={2}
+              placeholder="描述规则的作用和场景"
             />
           </div>
-
-          <div className="flex items-end">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="mr-2 h-4 w-4"
-              />
-              <span className="text-sm font-medium text-gray-700">启用规则</span>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            规则描述
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            rows={2}
-            placeholder="描述规则的作用和场景"
-          />
         </div>
 
         {/* 条件配置 */}
         <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              条件配置 (JSON)
-            </label>
-            <div className="space-x-2">
-              <button
-                type="button"
-                onClick={() => loadTemplate('condition', JSON.stringify({
-                  field: "level",
-                  operator: "eq",
-                  value: "ERROR"
-                }, null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                单条件模板
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('condition', JSON.stringify({
-                  all: [
-                    { field: "level", operator: "eq", value: "ERROR" },
-                    { field: "service", operator: "eq", value: "api" }
-                  ]
-                }, null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                AND 模板
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('condition', JSON.stringify({
-                  any: [
-                    { field: "level", operator: "eq", value: "ERROR" },
-                    { field: "level", operator: "eq", value: "PANIC" }
-                  ]
-                }, null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                OR 模板
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('condition', JSON.stringify({
-                  not: {
-                    field: "environment",
-                    operator: "eq",
-                    value: "dev"
-                  }
-                }, null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                NOT 模板
-              </button>
-            </div>
-          </div>
-          <textarea
-            value={conditionJson}
-            onChange={(e) => setConditionJson(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-            rows={10}
-          />
-          <div className="mt-2 grid grid-cols-2 gap-4 text-xs text-gray-500">
-            <div>
-              <p className="font-medium mb-1">操作符列表：</p>
-              <div className="grid grid-cols-2 gap-1">
-                {OPERATOR_OPTIONS.map(op => (
-                  <div key={op.value}>{op.label}</div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="font-medium mb-1">复合条件：</p>
-              <ul className="space-y-1">
-                <li><code>all</code>: 所有条件都满足 (AND)</li>
-                <li><code>any</code>: 任一条件满足 (OR)</li>
-                <li><code>not</code>: 条件不满足 (NOT)</li>
-                <li>支持任意嵌套组合</li>
-              </ul>
-            </div>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">触发条件</h3>
+          <ConditionBuilder condition={condition} onChange={setCondition} />
         </div>
 
         {/* 动作配置 */}
         <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              动作配置 (JSON)
-            </label>
-            <div className="space-x-2">
-              <button
-                type="button"
-                onClick={() => loadTemplate('action', JSON.stringify([{ type: "drop" }], null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Drop
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('action', JSON.stringify([{ type: "keep" }], null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Keep
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('action', JSON.stringify([{ type: "sample", config: { rate: 0.1 } }], null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Sample
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('action', JSON.stringify([{ type: "mask", config: { field: "password" } }], null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Mask
-              </button>
-              <button
-                type="button"
-                onClick={() => loadTemplate('action', JSON.stringify([{ type: "set", config: { field: "processed", value: true } }], null, 2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Set
-              </button>
-            </div>
-          </div>
-          <textarea
-            value={actionsJson}
-            onChange={(e) => setActionsJson(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-            rows={10}
-          />
-          <div className="mt-2 text-xs text-gray-500">
-            <p className="font-medium mb-1">动作类型及配置：</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-medium">流控制:</span>
-                <ul className="ml-4 space-y-1">
-                  <li><code>keep</code> - 保留并终止</li>
-                  <li><code>drop</code> - 丢弃并终止</li>
-                  <li><code>sample</code> - 采样 (config.rate: 0.0-1.0)</li>
-                </ul>
-              </div>
-              <div>
-                <span className="font-medium">转换:</span>
-                <ul className="ml-4 space-y-1">
-                  <li><code>mask</code> - 掩码 (config.field, config.pattern)</li>
-                  <li><code>truncate</code> - 截断 (config.field, config.max_length)</li>
-                  <li><code>extract</code> - 提取 (config.source_field, config.target_field)</li>
-                  <li><code>rename</code> - 重命名 (config.from, config.to)</li>
-                  <li><code>remove</code> - 删除 (config.fields: string[])</li>
-                  <li><code>set</code> - 设置 (config.field, config.value)</li>
-                </ul>
-              </div>
-              <div>
-                <span className="font-medium">元数据:</span>
-                <ul className="ml-4 space-y-1">
-                  <li><code>mark</code> - 标记 (config.reason)</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">执行动作</h3>
+          <ActionEditor actions={actions} onChange={setActions} />
         </div>
 
         {/* 提交按钮 */}
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-end space-x-3 pt-4 border-t">
           <button
             type="button"
             onClick={onCancel}
