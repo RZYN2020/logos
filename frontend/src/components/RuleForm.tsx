@@ -631,7 +631,7 @@ export default function RuleForm({
           const suggestedCondition: Condition = {
             all: [
               { field: "path", operator: "contains", value: initialFile || "" },
-              { field: "custom_line", operator: "eq", value: initialLine },
+              { field: "line_number", operator: "eq", value: initialLine },
             ],
           };
 
