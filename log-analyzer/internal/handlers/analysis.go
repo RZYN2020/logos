@@ -98,8 +98,8 @@ func (h *AnalysisHandler) ClusterLogs(c *gin.Context) {
 
 // RecommendRulesRequest 规则推荐请求
 type RecommendRulesRequest struct {
-	Logs     []analysis.LogEntry `json:"logs" binding:"required"`
-	MinFreq  int                 `json:"min_frequency"`
+	Logs    []analysis.LogEntry `json:"logs" binding:"required"`
+	MinFreq int                 `json:"min_frequency"`
 }
 
 // RecommendRules 推荐规则

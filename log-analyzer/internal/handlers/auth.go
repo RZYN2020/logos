@@ -203,10 +203,10 @@ func (h *AuthHandler) ListUsers(c *gin.Context) {
 	var users []gin.H
 	for _, user := range h.users {
 		users = append(users, gin.H{
-			"id":        user.ID,
-			"username":  user.Username,
-			"email":     user.Email,
-			"roles":     user.Roles,
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"roles":      user.Roles,
 			"created_at": user.CreatedAt,
 		})
 	}

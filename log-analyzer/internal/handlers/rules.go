@@ -18,8 +18,8 @@ import (
 
 // RuleHandler 规则处理器
 type RuleHandler struct {
-	db       *gorm.DB
-	etcdCli  *etcd.Client
+	db      *gorm.DB
+	etcdCli *etcd.Client
 }
 
 // NewRuleHandler 创建规则处理器
@@ -32,14 +32,14 @@ func NewRuleHandler(db *gorm.DB, etcdCli *etcd.Client) *RuleHandler {
 
 // RuleRequest 规则创建/更新请求
 type RuleRequest struct {
-	Name        string              `json:"name" binding:"required"`
-	Description string              `json:"description"`
-	Enabled     bool                `json:"enabled"`
-	Priority    int                 `json:"priority"`
-	Service     string              `json:"service"`
-	Component   string              `json:"component"` // sdk or processor
-	Conditions  []ConditionRequest  `json:"conditions"`
-	Actions     []ActionRequest     `json:"actions"`
+	Name        string             `json:"name" binding:"required"`
+	Description string             `json:"description"`
+	Enabled     bool               `json:"enabled"`
+	Priority    int                `json:"priority"`
+	Service     string             `json:"service"`
+	Component   string             `json:"component"` // sdk or processor
+	Conditions  []ConditionRequest `json:"conditions"`
+	Actions     []ActionRequest    `json:"actions"`
 }
 
 // ConditionRequest 条件请求
@@ -206,10 +206,10 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 
 	// 创建版本记录
 	version := &models.RuleVersion{
-		ID:      uuid.New().String(),
-		RuleID:  ruleID,
-		Version: rule.Version,
-		Author:  c.GetHeader("X-User"),
+		ID:        uuid.New().String(),
+		RuleID:    ruleID,
+		Version:   rule.Version,
+		Author:    c.GetHeader("X-User"),
 		CreatedAt: time.Now(),
 	}
 	content, _ := json.Marshal(rule)
@@ -369,7 +369,7 @@ func (h *RuleHandler) TestRule(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"matched": matched,
+		"matched":   matched,
 		"test_data": testData,
 	})
 }

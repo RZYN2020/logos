@@ -23,24 +23,24 @@ import (
 
 // Config 服务器配置
 type Config struct {
-	ESAddresses    []string
-	PostgresDSN    string
-	ETCDEndpoints  []string
-	Port           string
-	LogLevel       string
+	ESAddresses   []string
+	PostgresDSN   string
+	ETCDEndpoints []string
+	Port          string
+	LogLevel      string
 }
 
 // Server HTTP 服务器
 type Server struct {
-	config      Config
-	engine      *gin.Engine
-	db          *gorm.DB
-	etcdCli     *etcd.Client
-	ruleHandler *handlers.RuleHandler
+	config          Config
+	engine          *gin.Engine
+	db              *gorm.DB
+	etcdCli         *etcd.Client
+	ruleHandler     *handlers.RuleHandler
 	analysisHandler *handlers.AnalysisHandler
-	reportHandler *handlers.ReportHandler
-	authHandler *handlers.AuthHandler
-	authConfig  *middleware.AuthConfig
+	reportHandler   *handlers.ReportHandler
+	authHandler     *handlers.AuthHandler
+	authConfig      *middleware.AuthConfig
 }
 
 // NewServer 创建服务器
@@ -75,15 +75,15 @@ func NewServer(cfg Config) (*Server, error) {
 	reportHandler := handlers.NewReportHandler(db)
 
 	s := &Server{
-		config:      cfg,
-		engine:      gin.Default(),
-		db:          db,
-		etcdCli:     etcdCli,
-		ruleHandler: ruleHandler,
+		config:          cfg,
+		engine:          gin.Default(),
+		db:              db,
+		etcdCli:         etcdCli,
+		ruleHandler:     ruleHandler,
 		analysisHandler: analysisHandler,
-		reportHandler: reportHandler,
-		authHandler: authHandler,
-		authConfig:  authConfig,
+		reportHandler:   reportHandler,
+		authHandler:     authHandler,
+		authConfig:      authConfig,
 	}
 
 	s.setupRoutes()

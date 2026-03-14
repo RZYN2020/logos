@@ -213,10 +213,10 @@ func TestValidateRule(t *testing.T) {
 
 	// 创建有效的测试数据
 	rule := &models.Rule{
-		ID:       "test-validate-001",
-		Name:     "test-rule",
-		Enabled:  true,
-		Version:  1,
+		ID:      "test-validate-001",
+		Name:    "test-rule",
+		Enabled: true,
+		Version: 1,
 		Conditions: []models.Condition{
 			{ID: "cond-validate-001", RuleID: "test-validate-001", Field: "level", Operator: "=", Value: "ERROR"},
 		},
@@ -246,10 +246,10 @@ func TestTestRule(t *testing.T) {
 
 	// 创建测试数据
 	rule := &models.Rule{
-		ID:       "test-rule-001",
-		Name:     "test-rule",
-		Enabled:  true,
-		Version:  1,
+		ID:      "test-rule-001",
+		Name:    "test-rule",
+		Enabled: true,
+		Version: 1,
 		Conditions: []models.Condition{
 			{ID: "cond-test-001", RuleID: "test-rule-001", Field: "level", Operator: "=", Value: "ERROR"},
 		},

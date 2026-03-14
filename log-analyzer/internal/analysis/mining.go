@@ -132,11 +132,11 @@ func (dt *DrainTree) extractPattern(tokens []string) string {
 
 // 预编译正则表达式（性能优化）
 var (
-	regexDigit    = regexp.MustCompile(`^\d+$`)
-	regexUUID     = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
-	regexIP       = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
+	regexDigit     = regexp.MustCompile(`^\d+$`)
+	regexUUID      = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
+	regexIP        = regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`)
 	regexTimestamp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
-	regexHex      = regexp.MustCompile(`^[a-f0-9]{8,}$`)
+	regexHex       = regexp.MustCompile(`^[a-f0-9]{8,}$`)
 )
 
 // isVariable 判断是否为变量
@@ -287,12 +287,12 @@ func (pm *PatternMiner) AnalyzePatterns(entries []LogEntry) []LogPattern {
 
 		hash := sha256.Sum256([]byte(pattern))
 		patterns = append(patterns, LogPattern{
-			ID:          fmt.Sprintf("%x", hash[:8]),
-			Pattern:     pattern,
-			Frequency:   count,
-			Severity:    severity,
-			Examples:    patternExamples[pattern],
-			CreatedAt:   time.Now(),
+			ID:        fmt.Sprintf("%x", hash[:8]),
+			Pattern:   pattern,
+			Frequency: count,
+			Severity:  severity,
+			Examples:  patternExamples[pattern],
+			CreatedAt: time.Now(),
 		})
 	}
 

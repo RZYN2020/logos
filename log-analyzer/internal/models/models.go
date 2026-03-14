@@ -36,18 +36,18 @@ func (m *JSONMap) Scan(value interface{}) error {
 
 // Rule 规则配置模型
 type Rule struct {
-	ID          string                 `json:"id" gorm:"primaryKey"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Enabled     bool                   `json:"enabled" gorm:"default:true"`
-	Priority    int                    `json:"priority" gorm:"default:0"`
-	Service     string                 `json:"service,omitempty" gorm:"index"`
-	Component   string                 `json:"component,omitempty" gorm:"index"` // sdk or processor
-	Conditions  []Condition            `json:"conditions" gorm:"foreignKey:RuleID"`
-	Actions     []Action               `json:"actions" gorm:"foreignKey:RuleID"`
-	Version     int                    `json:"version"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID          string      `json:"id" gorm:"primaryKey"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Enabled     bool        `json:"enabled" gorm:"default:true"`
+	Priority    int         `json:"priority" gorm:"default:0"`
+	Service     string      `json:"service,omitempty" gorm:"index"`
+	Component   string      `json:"component,omitempty" gorm:"index"` // sdk or processor
+	Conditions  []Condition `json:"conditions" gorm:"foreignKey:RuleID"`
+	Actions     []Action    `json:"actions" gorm:"foreignKey:RuleID"`
+	Version     int         `json:"version"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 // Condition 规则条件
@@ -61,10 +61,10 @@ type Condition struct {
 
 // Action 规则动作
 type Action struct {
-	ID     string   `json:"id" gorm:"primaryKey"`
-	RuleID string   `json:"rule_id" gorm:"index"`
-	Type   string   `json:"type"` // filter/drop/transform
-	Config JSONMap  `json:"config,omitempty" gorm:"type:text"`
+	ID     string  `json:"id" gorm:"primaryKey"`
+	RuleID string  `json:"rule_id" gorm:"index"`
+	Type   string  `json:"type"` // filter/drop/transform
+	Config JSONMap `json:"config,omitempty" gorm:"type:text"`
 }
 
 // RuleVersion 规则版本历史
@@ -93,10 +93,10 @@ type Strategy struct {
 
 // StrategyRule 策略规则
 type StrategyRule struct {
-	ID        string    `json:"id" gorm:"primaryKey"`
-	StrategyID string   `json:"strategy_id" gorm:"index"`
-	Condition JSONMap   `json:"condition" gorm:"type:text"`
-	Action    JSONMap   `json:"action" gorm:"type:text"`
+	ID         string  `json:"id" gorm:"primaryKey"`
+	StrategyID string  `json:"strategy_id" gorm:"index"`
+	Condition  JSONMap `json:"condition" gorm:"type:text"`
+	Action     JSONMap `json:"action" gorm:"type:text"`
 }
 
 // LogPattern 日志模式 (用于日志挖掘结果)
@@ -122,19 +122,19 @@ type LogCluster struct {
 
 // LogEntry 日志存储模型
 type LogEntry struct {
-	ID        uint                   `gorm:"primaryKey"`
-	Service   string                 `gorm:"index;not null"`
-	Component string                 `gorm:"index"`
-	Timestamp time.Time              `gorm:"index"`
-	Level     string                 `gorm:"index"`
-	Message   string                 `gorm:"type:text"`
-	Path      string                 `gorm:"index"` // 日志所在文件路径
-	Function  string                 `gorm:"index"` // 日志所在函数
-	LineNumber int                   `gorm:"index"` // 日志行号
-	TraceID   string                 `gorm:"index"`
-	UserID    string
-	Fields    JSONMap `gorm:"type:text"` // 额外字段
-	CreatedAt time.Time
+	ID         uint      `gorm:"primaryKey"`
+	Service    string    `gorm:"index;not null"`
+	Component  string    `gorm:"index"`
+	Timestamp  time.Time `gorm:"index"`
+	Level      string    `gorm:"index"`
+	Message    string    `gorm:"type:text"`
+	Path       string    `gorm:"index"` // 日志所在文件路径
+	Function   string    `gorm:"index"` // 日志所在函数
+	LineNumber int       `gorm:"index"` // 日志行号
+	TraceID    string    `gorm:"index"`
+	UserID     string
+	Fields     JSONMap `gorm:"type:text"` // 额外字段
+	CreatedAt  time.Time
 }
 
 // LogReport 日志报告模型

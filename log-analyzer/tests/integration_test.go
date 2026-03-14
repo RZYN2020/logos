@@ -418,24 +418,24 @@ func TestIntegration_LogIngestion(t *testing.T) {
 	t.Run("IngestLogsBatch", func(t *testing.T) {
 		logs := []map[string]interface{}{
 			{
-				"service":    "test-service",
-				"component":  "sdk",
-				"level":      "INFO",
-				"message":    "Request processed",
-				"path":       "/app/handler.go",
-				"function":   "HandleRequest",
+				"service":     "test-service",
+				"component":   "sdk",
+				"level":       "INFO",
+				"message":     "Request processed",
+				"path":        "/app/handler.go",
+				"function":    "HandleRequest",
 				"line_number": 50,
-				"timestamp":  time.Now().Format(time.RFC3339),
+				"timestamp":   time.Now().Format(time.RFC3339),
 			},
 			{
-				"service":    "test-service",
-				"component":  "sdk",
-				"level":      "WARN",
-				"message":    "Slow response detected",
-				"path":       "/app/handler.go",
-				"function":   "HandleRequest",
+				"service":     "test-service",
+				"component":   "sdk",
+				"level":       "WARN",
+				"message":     "Slow response detected",
+				"path":        "/app/handler.go",
+				"function":    "HandleRequest",
 				"line_number": 55,
-				"timestamp":  time.Now().Format(time.RFC3339),
+				"timestamp":   time.Now().Format(time.RFC3339),
 			},
 		}
 
