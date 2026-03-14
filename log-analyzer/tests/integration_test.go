@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/log-system/log-analyzer/internal/etcd"
@@ -21,12 +22,13 @@ import (
 
 // TestServer 测试服务器
 type TestServer struct {
-	router        *gin.Engine
-	db            *gorm.DB
-	authConfig    *middleware.AuthConfig
-	authHandler   *handlers.AuthHandler
-	ruleHandler   *handlers.RuleHandler
+	router          *gin.Engine
+	db              *gorm.DB
+	authConfig      *middleware.AuthConfig
+	authHandler     *handlers.AuthHandler
+	ruleHandler     *handlers.RuleHandler
 	analysisHandler *handlers.AnalysisHandler
+	reportHandler   *handlers.ReportHandler
 }
 
 // setupTestServer 设置测试服务器
@@ -40,6 +42,7 @@ func setupTestServer(t *testing.T) *TestServer {
 	// 迁移表
 	err = db.AutoMigrate(
 		&models.Rule{}, &models.Condition{}, &models.Action{}, &models.RuleVersion{},
+		&models.LogEntry{},
 	)
 	if err != nil {
 		t.Fatalf("failed to migrate: %v", err)
@@ -55,6 +58,9 @@ func setupTestServer(t *testing.T) *TestServer {
 
 	// 创建分析处理器
 	analysisHandler := handlers.NewAnalysisHandler()
+
+	// 创建报告处理器
+	reportHandler := handlers.NewReportHandler(db)
 
 	// 设置路由
 	router := gin.Default()
@@ -79,6 +85,16 @@ func setupTestServer(t *testing.T) *TestServer {
 		// 分析 API
 		auth.POST("/analysis/mine", analysisHandler.MinePatterns)
 		auth.POST("/analysis/recommend", analysisHandler.RecommendRules)
+
+		// 报告 API
+		auth.GET("/report/:service/top-lines", reportHandler.GetTopLines)
+		auth.GET("/report/:service/top-patterns", reportHandler.GetTopPatterns)
+		auth.GET("/report/:service", reportHandler.GetReport)
+
+		// 日志摄入 API
+		auth.POST("/logs", reportHandler.IngestLog)
+		auth.POST("/logs/batch", reportHandler.IngestBatch)
+		auth.POST("/logs/query", reportHandler.QueryLogs)
 	}
 
 	return &TestServer{
@@ -88,6 +104,7 @@ func setupTestServer(t *testing.T) *TestServer {
 		authHandler:     authHandler,
 		ruleHandler:     ruleHandler,
 		analysisHandler: analysisHandler,
+		reportHandler:   reportHandler,
 	}
 }
 
@@ -360,5 +377,177 @@ func TestIntegration_Authentication(t *testing.T) {
 		server.router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+// TestIntegration_LogIngestion 日志摄入集成测试
+func TestIntegration_LogIngestion(t *testing.T) {
+	server := setupTestServer(t)
+	token := server.login(t)
+
+	// 测试单条日志摄入
+	t.Run("IngestLog", func(t *testing.T) {
+		logJSON := `{
+			"service": "test-service",
+			"component": "sdk",
+			"level": "ERROR",
+			"message": "Connection failed: timeout",
+			"path": "/app/handler.go",
+			"function": "HandleRequest",
+			"line_number": 42,
+			"trace_id": "trace-123",
+			"user_id": "user-456",
+			"fields": {"key": "value"}
+		}`
+
+		req, _ := http.NewRequest("POST", "/api/v1/logs", bytes.NewBufferString(logJSON))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NotNil(t, response["id"])
+	})
+
+	// 测试批量日志摄入
+	t.Run("IngestLogsBatch", func(t *testing.T) {
+		logs := []map[string]interface{}{
+			{
+				"service":    "test-service",
+				"component":  "sdk",
+				"level":      "INFO",
+				"message":    "Request processed",
+				"path":       "/app/handler.go",
+				"function":   "HandleRequest",
+				"line_number": 50,
+				"timestamp":  time.Now().Format(time.RFC3339),
+			},
+			{
+				"service":    "test-service",
+				"component":  "sdk",
+				"level":      "WARN",
+				"message":    "Slow response detected",
+				"path":       "/app/handler.go",
+				"function":   "HandleRequest",
+				"line_number": 55,
+				"timestamp":  time.Now().Format(time.RFC3339),
+			},
+		}
+
+		body, _ := json.Marshal(map[string]interface{}{"logs": logs})
+		req, _ := http.NewRequest("POST", "/api/v1/logs/batch", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.Greater(t, int(response["ingested"].(float64)), 0)
+	})
+
+	// 测试日志查询
+	t.Run("QueryLogs", func(t *testing.T) {
+		queryJSON := `{
+			"service": "test-service",
+			"limit": 10
+		}`
+
+		req, _ := http.NewRequest("POST", "/api/v1/logs/query", bytes.NewBufferString(queryJSON))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NotNil(t, response["total"])
+		assert.NotNil(t, response["logs"])
+	})
+}
+
+// TestIntegration_LogReport 日志报告集成测试
+func TestIntegration_LogReport(t *testing.T) {
+	server := setupTestServer(t)
+	token := server.login(t)
+
+	// 先摄入一些测试日志
+	logs := []map[string]interface{}{
+		{"service": "report-test", "component": "sdk", "level": "ERROR", "message": "Connection failed", "path": "/app/db.go", "function": "Connect", "line_number": 100},
+		{"service": "report-test", "component": "sdk", "level": "ERROR", "message": "Connection failed", "path": "/app/db.go", "function": "Connect", "line_number": 100},
+		{"service": "report-test", "component": "sdk", "level": "ERROR", "message": "Connection failed", "path": "/app/db.go", "function": "Connect", "line_number": 100},
+		{"service": "report-test", "component": "sdk", "level": "INFO", "message": "Request processed successfully", "path": "/app/handler.go", "function": "Handle", "line_number": 50},
+		{"service": "report-test", "component": "sdk", "level": "INFO", "message": "Request processed successfully", "path": "/app/handler.go", "function": "Handle", "line_number": 50},
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{"logs": logs})
+	req, _ := http.NewRequest("POST", "/api/v1/logs/batch", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	// 测试 TOP 行号统计
+	t.Run("GetTopLines", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/report/report-test/top-lines", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NotNil(t, response["total_logs"])
+		assert.NotNil(t, response["top_lines"])
+		topLines := response["top_lines"].([]interface{})
+		assert.Greater(t, len(topLines), 0)
+	})
+
+	// 测试 TOP 模式统计
+	t.Run("GetTopPatterns", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/report/report-test/top-patterns", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NotNil(t, response["total_logs"])
+		assert.NotNil(t, response["top_patterns"])
+		topPatterns := response["top_patterns"].([]interface{})
+		assert.Greater(t, len(topPatterns), 0)
+	})
+
+	// 测试完整报告
+	t.Run("GetReport", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/report/report-test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NotNil(t, response["total_logs"])
+		assert.NotNil(t, response["top_lines"])
+		assert.NotNil(t, response["top_patterns"])
 	})
 }

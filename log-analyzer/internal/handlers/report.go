@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,12 +68,17 @@ func (h *ReportHandler) GetTopLines(c *gin.Context) {
 
 	topLines := make([]gin.H, len(results))
 	for i, r := range results {
+		// 计算百分比（避免除零）
+		percentage := 0.0
+		if total > 0 {
+			percentage = float64(r.Count) / float64(total) * 100
+		}
 		topLines[i] = gin.H{
 			"line_number": r.LineNumber,
 			"file":        r.Path,
 			"function":    r.Function,
 			"count":       r.Count,
-			"percentage":  float64(r.Count) / float64(total) * 100,
+			"percentage":  percentage,
 		}
 	}
 
@@ -125,9 +131,10 @@ func (h *ReportHandler) GetTopPatterns(c *gin.Context) {
 
 	topPatterns := make([]gin.H, len(patterns))
 	for i, p := range patterns {
-		// 获取示例日志
+		// 获取示例日志（转义 LIKE 特殊字符）
+		escapedPattern := escapeLikePattern(p.Pattern)
 		var sampleLogs []models.LogEntry
-		h.db.Where("service = ? AND message LIKE ?", service, "%"+p.Pattern+"%").
+		h.db.Where("service = ? AND message LIKE ?", service, "%"+escapedPattern+"%").
 			Limit(3).Find(&sampleLogs)
 
 		samples := make([]string, len(sampleLogs))
@@ -135,10 +142,16 @@ func (h *ReportHandler) GetTopPatterns(c *gin.Context) {
 			samples[j] = s.Message
 		}
 
+		// 计算百分比（避免除零）
+		percentage := 0.0
+		if total > 0 {
+			percentage = float64(p.Frequency) / float64(total) * 100
+		}
+
 		topPatterns[i] = gin.H{
 			"pattern":     p.Pattern,
 			"count":       p.Frequency,
-			"percentage":  float64(p.Frequency) / float64(total) * 100,
+			"percentage":  percentage,
 			"sample_logs": samples,
 		}
 	}
@@ -207,12 +220,17 @@ func (h *ReportHandler) getTopLinesData(service, component string) gin.H {
 
 	topLines := make([]gin.H, len(results))
 	for i, r := range results {
+		// 计算百分比（避免除零）
+		percentage := 0.0
+		if total > 0 {
+			percentage = float64(r.Count) / float64(total) * 100
+		}
 		topLines[i] = gin.H{
 			"line_number": r.LineNumber,
 			"file":        r.Path,
 			"function":    r.Function,
 			"count":       r.Count,
-			"percentage":  float64(r.Count) / float64(total) * 100,
+			"percentage":  percentage,
 		}
 	}
 
@@ -259,9 +277,10 @@ func (h *ReportHandler) getTopPatternsData(service, component string) gin.H {
 
 	topPatterns := make([]gin.H, len(patterns))
 	for i, p := range patterns {
-		// 获取示例日志
+		// 获取示例日志（转义 LIKE 特殊字符）
+		escapedPattern := escapeLikePattern(p.Pattern)
 		var sampleLogs []models.LogEntry
-		h.db.Where("service = ? AND message LIKE ?", service, "%"+p.Pattern+"%").
+		h.db.Where("service = ? AND message LIKE ?", service, "%"+escapedPattern+"%").
 			Limit(3).Find(&sampleLogs)
 
 		samples := make([]string, len(sampleLogs))
@@ -269,10 +288,16 @@ func (h *ReportHandler) getTopPatternsData(service, component string) gin.H {
 			samples[j] = s.Message
 		}
 
+		// 计算百分比（避免除零）
+		percentage := 0.0
+		if total > 0 {
+			percentage = float64(p.Frequency) / float64(total) * 100
+		}
+
 		topPatterns[i] = gin.H{
 			"pattern":     p.Pattern,
 			"count":       p.Frequency,
-			"percentage":  float64(p.Frequency) / float64(total) * 100,
+			"percentage":  percentage,
 			"sample_logs": samples,
 		}
 	}
@@ -431,4 +456,14 @@ func (h *ReportHandler) QueryLogs(c *gin.Context) {
 		"total": total,
 		"logs":  logs,
 	})
+}
+
+// escapeLikePattern 转义 LIKE 模式中的特殊字符
+// SQL LIKE 中 % 和 _ 是特殊字符，需要用 ESCAPE 转义
+func escapeLikePattern(s string) string {
+	// 转义 % 为 \%
+	s = strings.ReplaceAll(s, "%", "\\%")
+	// 转义 _ 为 \_
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
 }
