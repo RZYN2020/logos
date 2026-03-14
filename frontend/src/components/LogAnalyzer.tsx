@@ -36,7 +36,7 @@ export default function LogAnalyzer({ service }: LogAnalyzerProps) {
         limit: 100,
       });
 
-      const apiResults = (response.logs || []).map((log: any) => ({
+      const apiResults = (response.logs || []).map((log: Record<string, unknown>) => ({
         timestamp: log.timestamp || new Date().toISOString(),
         level: log.level || "INFO",
         service: log.service || service,
