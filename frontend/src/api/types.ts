@@ -8,6 +8,8 @@ export interface Rule {
   priority?: number;
   condition: Condition; // 单个复合条件，支持 all/any/not 嵌套
   actions: Action[];
+  service?: string; // 所属服务
+  component?: 'sdk' | 'processor'; // 所属组件类型
   version?: number;
   created_at?: string;
   updated_at?: string;
