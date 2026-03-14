@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiClient } from "../api/client";
 
 interface LogAnalyzerProps {
   service: string;
@@ -29,47 +30,23 @@ export default function LogAnalyzer({ service }: LogAnalyzerProps) {
     setLoading(true);
     setError(null);
     try {
-      // Mock 查询结果 - 根据当前服务过滤
-      const mockResults = [
-        {
-          timestamp: "2024-01-22T10:00:00Z",
-          level: "INFO",
-          service: service,
-          message: "Request received",
-          trace_id: "7a3c9f8d5e2b1a4",
-          user_id: "12345",
-        },
-        {
-          timestamp: "2024-01-22T10:00:01Z",
-          level: "INFO",
-          service: service,
-          message: "User authenticated",
-          trace_id: "7a3c9f8d5e2b1a4",
-          user_id: "12345",
-        },
-        {
-          timestamp: "2024-01-22T10:00:02Z",
-          level: "ERROR",
-          service: service,
-          message: "Payment processing failed",
-          trace_id: "7a3c9f8d5e2b1a5",
-          user_id: "12345",
-          error_code: "PAYMENT_001",
-        },
-        {
-          timestamp: "2024-01-22T10:00:03Z",
-          level: "WARN",
-          service: service,
-          message: "Order partially processed",
-          trace_id: "7a3c9f8d5e2b1a5",
-          user_id: "12345",
-        },
-      ];
+      // 调用真实 API 查询日志
+      const response = await apiClient.queryLogs({
+        service: service,
+        limit: 100,
+      });
 
-      // 模拟延迟
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const apiResults = (response.logs || []).map((log: any) => ({
+        timestamp: log.timestamp || new Date().toISOString(),
+        level: log.level || "INFO",
+        service: log.service || service,
+        message: log.message || "",
+        trace_id: log.trace_id || "",
+        user_id: log.user_id || "",
+        error_code: log.error_code || "",
+      }));
 
-      setResults(mockResults);
+      setResults(apiResults);
     } catch (err) {
       setError("查询失败");
       console.error(err);
