@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/log-system/log-analyzer/internal/etcd"
 	"github.com/log-system/log-analyzer/internal/models"
+	unifiedRule "github.com/log-system/logos/pkg/rule"
 	"gorm.io/gorm"
 )
 
@@ -32,27 +33,14 @@ func NewRuleHandler(db *gorm.DB, etcdCli *etcd.Client) *RuleHandler {
 
 // RuleRequest 规则创建/更新请求
 type RuleRequest struct {
-	Name        string             `json:"name" binding:"required"`
-	Description string             `json:"description"`
-	Enabled     bool               `json:"enabled"`
-	Priority    int                `json:"priority"`
-	Service     string             `json:"service"`
-	Component   string             `json:"component"` // sdk or processor
-	Conditions  []ConditionRequest `json:"conditions"`
-	Actions     []ActionRequest    `json:"actions"`
-}
-
-// ConditionRequest 条件请求
-type ConditionRequest struct {
-	Field    string      `json:"field" binding:"required"`
-	Operator string      `json:"operator" binding:"required"`
-	Value    interface{} `json:"value" binding:"required"`
-}
-
-// ActionRequest 动作请求
-type ActionRequest struct {
-	Type   string                 `json:"type" binding:"required"`
-	Config map[string]interface{} `json:"config"`
+	Name        string                  `json:"name" binding:"required"`
+	Description string                  `json:"description"`
+	Enabled     bool                    `json:"enabled"`
+	Priority    int                     `json:"priority"`
+	Service     string                  `json:"service"`
+	Component   string                  `json:"component"` // sdk or processor
+	Condition   unifiedRule.Condition   `json:"condition" binding:"required"`
+	Actions     []unifiedRule.ActionDef `json:"actions" binding:"required"`
 }
 
 // CreateRule 创建规则
@@ -63,8 +51,19 @@ func (h *RuleHandler) CreateRule(c *gin.Context) {
 		return
 	}
 
+	if err := req.Condition.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	for _, act := range req.Actions {
+		if err := act.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	ruleID := uuid.New().String()
-	rule := &models.Rule{
+	ur := &unifiedRule.Rule{
 		ID:          ruleID,
 		Name:        req.Name,
 		Description: req.Description,
@@ -72,30 +71,14 @@ func (h *RuleHandler) CreateRule(c *gin.Context) {
 		Priority:    req.Priority,
 		Service:     req.Service,
 		Component:   req.Component,
-		Version:     1,
+		Condition:   req.Condition,
+		Actions:     req.Actions,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
 
-	// 创建条件和动作
-	for _, cond := range req.Conditions {
-		rule.Conditions = append(rule.Conditions, models.Condition{
-			ID:       uuid.New().String(),
-			RuleID:   ruleID,
-			Field:    cond.Field,
-			Operator: cond.Operator,
-			Value:    cond.Value,
-		})
-	}
-
-	for _, act := range req.Actions {
-		rule.Actions = append(rule.Actions, models.Action{
-			ID:     uuid.New().String(),
-			RuleID: ruleID,
-			Type:   act.Type,
-			Config: act.Config,
-		})
-	}
+	rule := &models.Rule{}
+	rule.FromUnifiedRule(ur)
 
 	if err := h.db.Create(rule).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create rule"})
@@ -110,7 +93,7 @@ func (h *RuleHandler) CreateRule(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      ruleID,
-		"version": "1",
+		"version": strconv.Itoa(rule.Version),
 	})
 }
 
@@ -124,7 +107,7 @@ func (h *RuleHandler) GetRule(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, rule)
+	c.JSON(http.StatusOK, rule.ToUnifiedRule())
 }
 
 // ListRules 获取规则列表
@@ -146,7 +129,11 @@ func (h *RuleHandler) ListRules(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, rules)
+	unifiedRules := make([]*unifiedRule.Rule, 0, len(rules))
+	for i := range rules {
+		unifiedRules = append(unifiedRules, rules[i].ToUnifiedRule())
+	}
+	c.JSON(http.StatusOK, unifiedRules)
 }
 
 // UpdateRule 更新规则
@@ -154,7 +141,7 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 	ruleID := c.Param("id")
 
 	var rule models.Rule
-	if err := h.db.First(&rule, "id = ?", ruleID).Error; err != nil {
+	if err := h.db.Preload("Conditions").Preload("Actions").First(&rule, "id = ?", ruleID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "rule not found"})
 		return
 	}
@@ -165,41 +152,51 @@ func (h *RuleHandler) UpdateRule(c *gin.Context) {
 		return
 	}
 
-	// 更新规则
-	rule.Name = req.Name
-	rule.Description = req.Description
-	rule.Enabled = req.Enabled
-	rule.Priority = req.Priority
-	rule.Service = req.Service
-	rule.Component = req.Component
-	rule.Version++
-	rule.UpdatedAt = time.Now()
-
-	// 删除旧的条件和动作
-	h.db.Where("rule_id = ?", ruleID).Delete(&models.Condition{})
-	h.db.Where("rule_id = ?", ruleID).Delete(&models.Action{})
-
-	// 创建新的条件和动作
-	for _, cond := range req.Conditions {
-		rule.Conditions = append(rule.Conditions, models.Condition{
-			ID:       uuid.New().String(),
-			RuleID:   ruleID,
-			Field:    cond.Field,
-			Operator: cond.Operator,
-			Value:    cond.Value,
-		})
+	if err := req.Condition.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
 	for _, act := range req.Actions {
-		rule.Actions = append(rule.Actions, models.Action{
-			ID:     uuid.New().String(),
-			RuleID: ruleID,
-			Type:   act.Type,
-			Config: act.Config,
-		})
+		if err := act.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
-	if err := h.db.Save(&rule).Error; err != nil {
+	ur := &unifiedRule.Rule{
+		ID:          ruleID,
+		Name:        req.Name,
+		Description: req.Description,
+		Enabled:     req.Enabled,
+		Priority:    req.Priority,
+		Service:     req.Service,
+		Component:   req.Component,
+		Condition:   req.Condition,
+		Actions:     req.Actions,
+		CreatedAt:   rule.CreatedAt,
+		UpdatedAt:   time.Now(),
+	}
+
+	prevCreatedAt := rule.CreatedAt
+	prevVersion := rule.Version
+	rule.FromUnifiedRule(ur)
+	rule.CreatedAt = prevCreatedAt
+	if rule.Version <= prevVersion {
+		rule.Version = prevVersion + 1
+	}
+
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("rule_id = ?", ruleID).Delete(&models.Condition{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("rule_id = ?", ruleID).Delete(&models.Action{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).Save(&rule).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update rule"})
 		return
 	}

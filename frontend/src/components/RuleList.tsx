@@ -46,18 +46,17 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">加载规则中...</p>
+        <div className="text-center text-gray-500">
+          <p>加载规则中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* 页面标题 */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center border-b border-gray-200 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">规则配置</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -66,20 +65,20 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
         </div>
         <button
           onClick={onCreate}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          ➕ 新建规则
+          新建规则
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded text-sm">
           {error}
         </div>
       )}
 
       {/* 规则列表 */}
-      <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -107,15 +106,10 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
             {rules.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center">
-                  <div className="text-gray-400 mb-4">
-                    <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
                   <p className="text-gray-500 mb-4">暂无规则</p>
                   <button
                     onClick={onCreate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                   >
                     创建第一条规则
                   </button>
@@ -133,7 +127,7 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
+                    <div className="text-sm text-gray-700 max-w-xs truncate">
                       {rule.description || '-'}
                     </div>
                   </td>
@@ -149,25 +143,25 @@ export default function RuleList({ service, component, onEdit, onCreate }: RuleL
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-xs text-gray-500 max-w-xs truncate">
+                    <div className="text-xs text-gray-600 max-w-xs truncate">
                       {getConditionSummary(rule.condition)}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-600">
                       {rule.actions.map((a: Action) => a.type).join(', ')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => onEdit(rule.id)}
-                      className="text-blue-600 hover:text-blue-800 mr-3"
+                      className="text-blue-600 hover:text-blue-900 mr-3"
                     >
                       编辑
                     </button>
                     <button
                       onClick={() => handleDelete(rule.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="text-red-600 hover:text-red-900"
                     >
                       删除
                     </button>

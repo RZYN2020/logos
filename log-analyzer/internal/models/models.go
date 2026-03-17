@@ -202,8 +202,14 @@ func (r *Rule) FromUnifiedRule(ur *unifiedRule.Rule) {
 	r.Name = ur.Name
 	r.Description = ur.Description
 	r.Enabled = ur.Enabled
+	r.Priority = ur.Priority
+	r.Service = ur.Service
+	r.Component = ur.Component
 	r.Version++
 	r.UpdatedAt = time.Now()
+	if r.CreatedAt.IsZero() {
+		r.CreatedAt = time.Now()
+	}
 
 	// 清空旧的条件和动作
 	r.Conditions = nil

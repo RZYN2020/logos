@@ -72,13 +72,13 @@ function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleCon
   const value = condition.value ?? '';
 
   return (
-    <div className="flex items-end gap-2 p-3 bg-gray-50 rounded-md">
+    <div className="flex items-end gap-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
       <div className="flex-1">
         <label className="block text-xs text-gray-500 mb-1">字段</label>
         <select
           value={field}
           onChange={(e) => onChange({ ...condition, field: e.target.value })}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+          className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border bg-gray-50"
         >
           {FIELD_OPTIONS.map(f => (
             <option key={f.value} value={f.value}>{f.label}</option>
@@ -90,7 +90,7 @@ function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleCon
             type="text"
             placeholder="输入字段名"
             onChange={(e) => onChange({ ...condition, field: e.target.value })}
-            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+            className="mt-2 block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
           />
         )}
       </div>
@@ -99,7 +99,7 @@ function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleCon
         <select
           value={operator}
           onChange={(e) => onChange({ ...condition, operator: e.target.value as ConditionOperator })}
-          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+          className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border bg-gray-50"
         >
           {OPERATOR_OPTIONS.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -113,7 +113,7 @@ function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleCon
           value={typeof value === 'string' ? value : JSON.stringify(value)}
           onChange={(e) => onChange({ ...condition, value: e.target.value })}
           placeholder="输入值"
-          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+          className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50 disabled:bg-gray-100 disabled:text-gray-500"
           disabled={operator === 'exists' || operator === 'not_exists'}
         />
       </div>
@@ -121,7 +121,7 @@ function SingleCondition({ condition, onChange, onRemove, canRemove }: SingleCon
         <button
           type="button"
           onClick={onRemove}
-          className="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-md"
+          className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md border border-transparent transition"
         >
           删除
         </button>
@@ -172,12 +172,12 @@ function CompositeCondition({ type, condition, onChange, onRemove, canRemove }: 
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-3">
+    <div className="border border-gray-200 rounded-md p-4 bg-white shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <span className={`text-sm font-medium px-2 py-1 rounded ${
-          type === 'all' ? 'bg-blue-100 text-blue-800' :
-          type === 'any' ? 'bg-green-100 text-green-800' :
-          'bg-red-100 text-red-800'
+        <span className={`text-xs font-semibold px-2 py-1 rounded border ${
+          type === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+          type === 'any' ? 'bg-green-50 text-green-700 border-green-200' :
+          'bg-red-50 text-red-700 border-red-200'
         }`}>
           {type === 'all' ? 'AND (且)' : type === 'any' ? 'OR (或)' : 'NOT (非)'}
         </span>
@@ -205,7 +205,7 @@ function CompositeCondition({ type, condition, onChange, onRemove, canRemove }: 
       <button
         type="button"
         onClick={addCondition}
-        className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+        className="mt-3 text-sm text-blue-600 hover:text-blue-800"
       >
         + 添加条件
       </button>
@@ -235,8 +235,8 @@ function ConditionBuilder({ condition, onChange }: ConditionBuilderProps) {
         <button
           type="button"
           onClick={() => onChange({ field: 'level', operator: 'eq', value: 'ERROR' })}
-          className={`px-3 py-1 text-sm rounded ${
-            type === 'single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          className={`px-3 py-2 text-xs font-medium rounded border transition ${
+            type === 'single' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
           }`}
         >
           单条件
@@ -244,8 +244,8 @@ function ConditionBuilder({ condition, onChange }: ConditionBuilderProps) {
         <button
           type="button"
           onClick={() => onChange({ all: [{ field: 'level', operator: 'eq', value: 'ERROR' }] })}
-          className={`px-3 py-1 text-sm rounded ${
-            type === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          className={`px-3 py-2 text-xs font-medium rounded border transition ${
+            type === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
           }`}
         >
           AND 且
@@ -253,8 +253,8 @@ function ConditionBuilder({ condition, onChange }: ConditionBuilderProps) {
         <button
           type="button"
           onClick={() => onChange({ any: [{ field: 'level', operator: 'eq', value: 'ERROR' }] })}
-          className={`px-3 py-1 text-sm rounded ${
-            type === 'any' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          className={`px-3 py-2 text-xs font-medium rounded border transition ${
+            type === 'any' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
           }`}
         >
           OR 或
@@ -262,8 +262,8 @@ function ConditionBuilder({ condition, onChange }: ConditionBuilderProps) {
         <button
           type="button"
           onClick={() => onChange({ not: { field: 'level', operator: 'eq', value: 'ERROR' } })}
-          className={`px-3 py-1 text-sm rounded ${
-            type === 'not' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          className={`px-3 py-2 text-xs font-medium rounded border transition ${
+            type === 'not' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
           }`}
         >
           NOT 非
@@ -310,9 +310,9 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
   return (
     <div className="space-y-3">
       {actions.map((action, index) => (
-        <div key={index} className="border border-gray-200 rounded-lg p-3">
+        <div key={index} className="border border-gray-200 bg-white shadow-sm rounded-md p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">动作 #{index + 1}</span>
+            <span className="text-sm font-medium text-gray-900">动作 #{index + 1}</span>
             {actions.length > 1 && (
               <button
                 type="button"
@@ -325,7 +325,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           </div>
 
           <div className="mb-3">
-            <label className="block text-xs text-gray-500 mb-1">动作类型</label>
+            <label className="block text-xs text-gray-500 mb-2">动作类型</label>
             <select
               value={action.type}
               onChange={(e) => {
@@ -340,7 +340,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                 }
                 updateAction(index, { type: newType, config: newConfig });
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border bg-gray-50"
             >
               {ACTION_TYPE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>
@@ -353,7 +353,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {/* 根据动作类型显示不同配置 */}
           {action.type === 'sample' && (
             <div className="mb-2">
-              <label className="block text-xs text-gray-500 mb-1">采样率 (0.0-1.0)</label>
+              <label className="block text-xs text-gray-500 mb-2">采样率 (0.0-1.0)</label>
               <input
                 type="number"
                 min="0"
@@ -364,7 +364,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                   ...action,
                   config: { ...action.config, rate: parseFloat(e.target.value) }
                 })}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
               />
             </div>
           )}
@@ -372,7 +372,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {action.type === 'mask' && (
             <>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">要掩码的字段</label>
+                <label className="block text-xs text-gray-500 mb-2">要掩码的字段</label>
                 <input
                   type="text"
                   value={action.config?.field || ''}
@@ -380,12 +380,12 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, field: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                   placeholder="例如：password"
                 />
               </div>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">掩码模式 (可选)</label>
+                <label className="block text-xs text-gray-500 mb-2">掩码模式 (可选)</label>
                 <input
                   type="text"
                   value={action.config?.pattern || ''}
@@ -393,7 +393,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, pattern: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                   placeholder="例如：\d+"
                 />
               </div>
@@ -403,7 +403,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {action.type === 'truncate' && (
             <>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">要截断的字段</label>
+                <label className="block text-xs text-gray-500 mb-2">要截断的字段</label>
                 <input
                   type="text"
                   value={action.config?.field || ''}
@@ -411,11 +411,11 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, field: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">最大长度</label>
+                <label className="block text-xs text-gray-500 mb-2">最大长度</label>
                 <input
                   type="number"
                   value={action.config?.max_length || 100}
@@ -423,7 +423,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, max_length: parseInt(e.target.value) }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
             </>
@@ -432,7 +432,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {action.type === 'extract' && (
             <>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">源字段</label>
+                <label className="block text-xs text-gray-500 mb-2">源字段</label>
                 <input
                   type="text"
                   value={action.config?.source_field || ''}
@@ -440,11 +440,11 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, source_field: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">目标字段</label>
+                <label className="block text-xs text-gray-500 mb-2">目标字段</label>
                 <input
                   type="text"
                   value={action.config?.target_field || ''}
@@ -452,7 +452,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, target_field: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
             </>
@@ -461,7 +461,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {action.type === 'rename' && (
             <>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">原字段名</label>
+                <label className="block text-xs text-gray-500 mb-2">原字段名</label>
                 <input
                   type="text"
                   value={action.config?.from || ''}
@@ -469,11 +469,11 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, from: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">新字段名</label>
+                <label className="block text-xs text-gray-500 mb-2">新字段名</label>
                 <input
                   type="text"
                   value={action.config?.to || ''}
@@ -481,7 +481,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, to: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
             </>
@@ -489,7 +489,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
 
           {action.type === 'remove' && (
             <div className="mb-2">
-              <label className="block text-xs text-gray-500 mb-1">要删除的字段 (逗号分隔)</label>
+              <label className="block text-xs text-gray-500 mb-2">要删除的字段 (逗号分隔)</label>
               <input
                 type="text"
                 value={(action.config?.fields || []).join(', ')}
@@ -497,7 +497,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                   ...action,
                   config: { fields: e.target.value.split(',').map(s => s.trim()) }
                 })}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 placeholder="例如：field1, field2"
               />
             </div>
@@ -506,7 +506,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
           {action.type === 'set' && (
             <>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">字段名</label>
+                <label className="block text-xs text-gray-500 mb-2">字段名</label>
                 <input
                   type="text"
                   value={action.config?.field || ''}
@@ -514,11 +514,11 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                     ...action,
                     config: { ...action.config, field: e.target.value }
                   })}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
               <div className="mb-2">
-                <label className="block text-xs text-gray-500 mb-1">字段值</label>
+                <label className="block text-xs text-gray-500 mb-2">字段值</label>
                 <input
                   type="text"
                   value={String(action.config?.value || '')}
@@ -533,7 +533,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                       config: { ...action.config, value: parsed }
                     });
                   }}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 />
               </div>
             </>
@@ -541,7 +541,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
 
           {action.type === 'mark' && (
             <div className="mb-2">
-              <label className="block text-xs text-gray-500 mb-1">标记原因</label>
+              <label className="block text-xs text-gray-500 mb-2">标记原因</label>
               <input
                 type="text"
                 value={action.config?.reason || ''}
@@ -549,7 +549,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
                   ...action,
                   config: { ...action.config, reason: e.target.value }
                 })}
-                className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                className="block w-full px-3 py-2 border border-gray-300 shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-50"
                 placeholder="例如：匹配规则 #123"
               />
             </div>
@@ -560,7 +560,7 @@ function ActionEditor({ actions, onChange }: ActionEditorProps) {
       <button
         type="button"
         onClick={addAction}
-        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500"
+        className="w-full py-2 border border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-500 hover:text-blue-600 bg-gray-50 transition"
       >
         + 添加动作
       </button>
@@ -696,12 +696,12 @@ export default function RuleForm({
   };
 
   return (
-    <div className="px-4 py-6">
-      <div className="mb-4">
-        <button onClick={onCancel} className="text-gray-600 hover:text-gray-900 mb-4">
+    <div className="p-6">
+      <div className="mb-6">
+        <button onClick={onCancel} className="text-sm text-blue-600 hover:text-blue-800 mb-4">
           ← 返回列表
         </button>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-gray-200 pb-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {ruleId ? "编辑规则" : "新建规则"}
@@ -712,12 +712,12 @@ export default function RuleForm({
           </div>
           <div className="flex gap-2">
             {initialLine && (
-              <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+              <div className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-sm">
                 基于行号 L{initialLine} 生成
               </div>
             )}
             {initialPattern && (
-              <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+              <div className="px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-sm">
                 基于模式生成
               </div>
             )}
@@ -726,93 +726,98 @@ export default function RuleForm({
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded text-sm mb-6">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">加载中...</p>
-          </div>
+        <div className="flex items-center justify-center py-12 text-gray-500">
+          <p>加载中...</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8 bg-white p-6 border border-gray-200 rounded-md">
         {/* 基本信息 */}
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">基本信息</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+            <div className="sm:col-span-3">
+              <label className="block text-sm font-medium text-gray-700">
                 规则名称
               </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                placeholder="例如：drop-debug-logs"
-                required
-              />
+              <div className="mt-1">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border bg-gray-50"
+                  placeholder="例如：drop-debug-logs"
+                  required
+                />
+              </div>
             </div>
 
-            <div className="flex items-end">
-              <label className="flex items-center">
+            <div className="sm:col-span-3 flex items-end pb-2">
+              <div className="flex items-center">
                 <input
                   type="checkbox"
                   checked={enabled}
                   onChange={(e) => setEnabled(e.target.checked)}
-                  className="mr-2 h-4 w-4"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <span className="text-sm font-medium text-gray-700">启用规则</span>
-              </label>
+                <label className="ml-2 block text-sm text-gray-900">
+                  启用规则
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              规则描述
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              rows={2}
-              placeholder="描述规则的作用和场景"
-            />
+            <div className="sm:col-span-6">
+              <label className="block text-sm font-medium text-gray-700">
+                规则描述
+              </label>
+              <div className="mt-1">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border bg-gray-50"
+                  placeholder="描述规则的作用和场景"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* 条件配置 */}
-        <div>
+        <div className="pt-6 border-t border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 mb-4">触发条件</h3>
           <ConditionBuilder condition={condition} onChange={setCondition} />
         </div>
 
         {/* 动作配置 */}
-        <div>
+        <div className="pt-6 border-t border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 mb-4">执行动作</h3>
           <ActionEditor actions={actions} onChange={setActions} />
         </div>
 
         {/* 提交按钮 */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? "保存中..." : "保存"}
-          </button>
+        <div className="pt-5 border-t border-gray-200">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
+            >
+              {saving ? "保存中..." : "保存"}
+            </button>
+          </div>
         </div>
       </form>
       )}

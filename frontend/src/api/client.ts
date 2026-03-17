@@ -6,14 +6,32 @@ import type {
   LogLineStat,
   LogPatternStat,
 } from "./types";
+import { isMockEnabled, mockApi } from "./mock";
 
-const API_BASE = "http://localhost:8080/api/v1";
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ||
+  "http://localhost:8080/api/v1";
 
 // 认证 token（用于需要认证的请求）
 let authToken: string | null = null;
 
 export const setAuthToken = (token: string | null) => {
   authToken = token;
+};
+
+const readJson = async (res: Response): Promise<unknown> => {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+};
+
+const unwrap = <T>(payload: unknown): T => {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return (payload as ApiResponse<T>).data as T;
+  }
+  return payload as T;
 };
 
 const getHeaders = () => {
@@ -24,7 +42,7 @@ const getHeaders = () => {
   return headers;
 };
 
-export const apiClient = {
+const realApiClient = {
   // ============ 认证 API ============
 
   async login(username: string, password: string): Promise<{ token: string }> {
@@ -33,15 +51,29 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const raw = await readJson(res);
     if (!res.ok) {
-      throw new Error(data.message || "Login failed");
+      const msg =
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+        (raw && typeof raw === "object" && "message" in raw && String((raw as any).message)) ||
+        "Login failed";
+      throw new Error(msg);
     }
-    const token = data.token || data.data?.token || "";
+    const token =
+      (raw && typeof raw === "object" && "token" in raw && String((raw as any).token)) ||
+      (unwrap<{ token?: string }>(raw)?.token ?? "");
     if (token) {
       setAuthToken(token);
     }
     return { token };
+  },
+
+  async getCurrentUser(): Promise<{ user_id: string; username: string; roles: string[] } | null> {
+    const res = await fetch(`${API_BASE}/user`, { headers: getHeaders() });
+    if (!res.ok) return null;
+    const raw = await readJson(res);
+    const data = unwrap<{ user_id: string; username: string; roles: string[] } | null>(raw);
+    return data || (raw as any) || null;
   },
 
   // ============ 规则 API ============
@@ -56,19 +88,34 @@ export const apiClient = {
     if (queryString) url += `?${queryString}`;
 
     const res = await fetch(url, { headers: getHeaders() });
-    const data: ApiResponse<Rule[] | { rules: Rule[] }> = await res.json();
-    if (Array.isArray(data.data)) {
-      return data.data;
+    const raw = await readJson(res);
+    if (!res.ok) {
+      throw new Error(
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+          "Failed to list rules"
+      );
     }
-    return data.data?.rules || [];
+    const data = unwrap<unknown>(raw);
+    if (Array.isArray(data)) return data as Rule[];
+    if (data && typeof data === "object" && "rules" in data && Array.isArray((data as any).rules)) {
+      return (data as any).rules as Rule[];
+    }
+    return [];
   },
 
   // 获取单个规则
   async getRule(id: string): Promise<Rule | null> {
     const res = await fetch(`${API_BASE}/rules/${id}`, { headers: getHeaders() });
     if (res.status === 404) return null;
-    const data: ApiResponse<Rule> = await res.json();
-    return data.data || null;
+    const raw = await readJson(res);
+    if (!res.ok) {
+      throw new Error(
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+          "Failed to get rule"
+      );
+    }
+    const data = unwrap<Rule | null>(raw);
+    return data || null;
   },
 
   // 创建规则
@@ -78,8 +125,19 @@ export const apiClient = {
       headers: { ...getHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(rule),
     });
-    const data: ApiResponse<{ id: string }> = await res.json();
-    return data.data || { id: "" };
+    const raw = await readJson(res);
+    if (!res.ok) {
+      throw new Error(
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+          "Failed to create rule"
+      );
+    }
+    const data = unwrap<{ id?: string }>(raw);
+    if (data?.id) return { id: data.id };
+    if (raw && typeof raw === "object" && "id" in raw && String((raw as any).id)) {
+      return { id: String((raw as any).id) };
+    }
+    return { id: "" };
   },
 
   // 更新规则
@@ -89,15 +147,28 @@ export const apiClient = {
       headers: { ...getHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(rule),
     });
-    if (!res.ok) throw new Error("Failed to update rule");
+    if (!res.ok) {
+      const raw = await readJson(res);
+      throw new Error(
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+          "Failed to update rule"
+      );
+    }
   },
 
   // 删除规则
   async deleteRule(id: string): Promise<void> {
-    await fetch(`${API_BASE}/rules/${id}`, {
+    const res = await fetch(`${API_BASE}/rules/${id}`, {
       method: "DELETE",
       headers: getHeaders(),
     });
+    if (!res.ok) {
+      const raw = await readJson(res);
+      throw new Error(
+        (raw && typeof raw === "object" && "error" in raw && String((raw as any).error)) ||
+          "Failed to delete rule"
+      );
+    }
   },
 
   // ============ 日志报告 API ============
@@ -224,3 +295,7 @@ export const apiClient = {
     };
   },
 };
+
+export const apiClient = (isMockEnabled()
+  ? (mockApi as typeof realApiClient)
+  : realApiClient);

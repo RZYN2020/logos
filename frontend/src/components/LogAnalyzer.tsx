@@ -95,7 +95,7 @@ LIMIT 50;`,
     <div className="px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900">
             日志分析
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -107,14 +107,14 @@ LIMIT 50;`,
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 查询编辑器 */}
         <div className="lg:col-span-1">
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-md p-6">
+            <div className="mb-4 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">
                 SQL 查询编辑器
               </h2>
               <button
                 onClick={setExampleQueries}
-                className="text-sm text-blue-600 hover:text-blue-800"
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
                 填入示例查询
               </button>
@@ -123,54 +123,54 @@ LIMIT 50;`,
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full h-64 px-4 py-3 border border-gray-300 rounded-md font-mono text-sm text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
               placeholder="输入 SQL 查询语句..."
             />
 
             <button
               onClick={handleRunQuery}
               disabled={loading}
-              className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400"
             >
               {loading ? "查询中..." : "执行查询"}
             </button>
 
             {error && (
-              <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              <div className="mt-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded text-sm">
                 {error}
               </div>
             )}
           </div>
 
           {/* 快捷查询 */}
-          <div className="bg-white shadow rounded-lg p-6 mt-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-md p-6 mt-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
               快捷查询
             </h2>
             <div className="space-y-2">
               <button
                 onClick={() => setQuery(`SELECT * FROM logs WHERE level = 'ERROR' ORDER BY timestamp DESC LIMIT 100`)}
-                className="w-full text-left px-4 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100"
+                className="w-full text-left px-4 py-2 bg-red-50 text-red-700 rounded-md border border-red-200 hover:bg-red-100 transition"
               >
-                🔴 最近错误日志
+                最近错误日志
               </button>
               <button
                 onClick={() => setQuery(`SELECT service, COUNT(*) as count FROM logs WHERE timestamp > NOW() - INTERVAL 1 HOUR GROUP BY service ORDER BY count DESC`)}
-                className="w-full text-left px-4 py-2 bg-yellow-50 text-yellow-700 rounded-md hover:bg-yellow-100"
+                className="w-full text-left px-4 py-2 bg-yellow-50 text-yellow-700 rounded-md border border-yellow-200 hover:bg-yellow-100 transition"
               >
-                📊 按服务统计
+                按服务统计
               </button>
               <button
                 onClick={() => setQuery(`SELECT level, COUNT(*) as count FROM logs GROUP BY level ORDER BY count DESC`)}
-                className="w-full text-left px-4 py-2 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                className="w-full text-left px-4 py-2 bg-blue-50 text-blue-700 rounded-md border border-blue-200 hover:bg-blue-100 transition"
               >
-                📊 按级别统计
+                按级别统计
               </button>
               <button
                 onClick={() => setQuery(`SELECT user_id, COUNT(*) as request_count FROM logs WHERE event_type = 'request' GROUP BY user_id ORDER BY request_count DESC LIMIT 10`)}
-                className="w-full text-left px-4 py-2 bg-green-50 text-green-700 rounded-md hover:bg-green-100"
+                className="w-full text-left px-4 py-2 bg-green-50 text-green-700 rounded-md border border-green-200 hover:bg-green-100 transition"
               >
-                👥 活跃用户排行
+                活跃用户排行
               </button>
             </div>
           </div>
@@ -178,13 +178,13 @@ LIMIT 50;`,
 
         {/* 查询结果 */}
         <div className="lg:col-span-2">
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">
+          <div className="bg-white border border-gray-200 shadow-sm rounded-md p-6">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-lg font-bold text-gray-900">
                 查询结果 ({results.length} 条)
               </h2>
               {results.length > 0 && (
-                <button className="text-sm text-blue-600 hover:text-blue-800">
+                <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
                   导出结果
                 </button>
               )}
@@ -245,7 +245,7 @@ LIMIT 50;`,
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           {log.service}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                        <td className="px-4 py-3 text-sm text-gray-700">
                           {log.message}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500 font-mono">
