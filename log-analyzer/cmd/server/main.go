@@ -40,6 +40,7 @@ type Server struct {
 	analysisHandler *handlers.AnalysisHandler
 	reportHandler   *handlers.ReportHandler
 	authHandler     *handlers.AuthHandler
+	alertHandler    *handlers.AlertHandler
 	authConfig      *middleware.AuthConfig
 }
 
@@ -73,6 +74,7 @@ func NewServer(cfg Config) (*Server, error) {
 	ruleHandler := handlers.NewRuleHandler(db, etcdCli)
 	analysisHandler := handlers.NewAnalysisHandler()
 	reportHandler := handlers.NewReportHandler(db)
+	alertHandler := handlers.NewAlertHandler(db)
 
 	s := &Server{
 		config:          cfg,
@@ -83,6 +85,7 @@ func NewServer(cfg Config) (*Server, error) {
 		analysisHandler: analysisHandler,
 		reportHandler:   reportHandler,
 		authHandler:     authHandler,
+		alertHandler:    alertHandler,
 		authConfig:      authConfig,
 	}
 
@@ -159,6 +162,14 @@ func (s *Server) setupRoutes() {
 			auth.POST("/logs", s.reportHandler.IngestLog)
 			auth.POST("/logs/batch", s.reportHandler.IngestBatch)
 			auth.POST("/logs/query", s.reportHandler.QueryLogs)
+
+			// 告警管理 API - 新增
+			auth.GET("/alerts/rules", s.alertHandler.ListAlertRules)
+			auth.POST("/alerts/rules", s.alertHandler.CreateAlertRule)
+			auth.PUT("/alerts/rules/:id", s.alertHandler.UpdateAlertRule)
+			auth.DELETE("/alerts/rules/:id", s.alertHandler.DeleteAlertRule)
+			auth.GET("/alerts/history", s.alertHandler.ListAlertHistory)
+			auth.PUT("/alerts/history/:id/resolve", s.alertHandler.ResolveAlert)
 		}
 	}
 }

@@ -34,6 +34,33 @@ func (m *JSONMap) Scan(value interface{}) error {
 	return json.Unmarshal(data, m)
 }
 
+// AlertRule 告警规则模型
+type AlertRule struct {
+	ID          string      `json:"id" gorm:"primaryKey"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Enabled     bool        `json:"enabled" gorm:"default:true"`
+	Service     string      `json:"service" gorm:"index"`
+	Condition   JSONMap     `json:"condition" gorm:"type:text"` // 告警触发条件
+	Threshold   int         `json:"threshold" gorm:"default:1"` // 触发阈值
+	Window      int         `json:"window" gorm:"default:60"`   // 时间窗口（秒）
+	Channels    JSONMap     `json:"channels" gorm:"type:text"`  // 通知渠道配置 (email, webhook, etc.)
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
+// AlertHistory 告警历史模型
+type AlertHistory struct {
+	ID          string    `json:"id" gorm:"primaryKey"`
+	RuleID      string    `json:"rule_id" gorm:"index"`
+	Service     string    `json:"service" gorm:"index"`
+	Message     string    `json:"message" gorm:"type:text"` // 告警内容
+	Level       string    `json:"level" gorm:"index"`       // 告警级别
+	TriggerTime time.Time `json:"trigger_time" gorm:"index"`
+	Status      string    `json:"status" gorm:"index"`      // 状态：pending, resolved, ignored
+	Details     JSONMap   `json:"details" gorm:"type:text"` // 触发时的上下文数据
+}
+
 // Rule 规则配置模型
 type Rule struct {
 	ID          string      `json:"id" gorm:"primaryKey"`

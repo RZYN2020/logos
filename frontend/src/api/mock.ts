@@ -27,11 +27,15 @@ const state: {
   seeded: boolean;
   rules: Rule[];
   logs: MockLog[];
+  alertRules: any[];
+  alertHistory: any[];
   nextLogId: number;
 } = {
   seeded: false,
   rules: [],
   logs: [],
+  alertRules: [],
+  alertHistory: [],
   nextLogId: 1,
 };
 
@@ -143,6 +147,47 @@ const seed = () => {
       fields: { env: "local", duration_ms: level === "WARN" ? 900 + (i % 200) : 30 + (i % 60) },
     });
   }
+
+  // 告警规则数据
+  state.alertRules.push(
+    {
+      id: makeId(),
+      name: "API Gateway 错误率过高",
+      description: "当 api-gateway 的 ERROR 日志在一分钟内超过 50 条时触发",
+      enabled: true,
+      service: "api-gateway",
+      condition: { field: "level", operator: "eq", value: "ERROR" },
+      threshold: 50,
+      window: 60,
+      channels: { webhook: "https://hook.example.com/alerts" },
+      created_at: iso(10 * 60 * 60 * 1000),
+      updated_at: iso(10 * 60 * 60 * 1000),
+    }
+  );
+
+  // 告警历史数据
+  state.alertHistory.push(
+    {
+      id: makeId(),
+      rule_id: state.alertRules[0].id,
+      service: "api-gateway",
+      message: "触发告警: API Gateway 错误率过高",
+      level: "ERROR",
+      trigger_time: iso(5 * 60 * 1000), // 5分钟前
+      status: "pending",
+      details: { count: 53, window: 60 },
+    },
+    {
+      id: makeId(),
+      rule_id: state.alertRules[0].id,
+      service: "api-gateway",
+      message: "触发告警: API Gateway 错误率过高",
+      level: "ERROR",
+      trigger_time: iso(60 * 60 * 1000), // 1小时前
+      status: "resolved",
+      details: { count: 61, window: 60 },
+    }
+  );
 };
 
 const normalizePattern = (s: string) => {
@@ -305,5 +350,48 @@ export const mockApi = {
     const offset = query.offset || 0;
     const limit = query.limit || 100;
     return { total, logs: logs.slice(offset, offset + limit) };
+  },
+
+  async listAlertRules(service?: string): Promise<any[]> {
+    seed();
+    return state.alertRules.filter((r) => !service || r.service === service);
+  },
+
+  async createAlertRule(rule: any): Promise<any> {
+    seed();
+    const newRule = {
+      ...rule,
+      id: makeId(),
+      created_at: iso(),
+      updated_at: iso(),
+    };
+    state.alertRules.push(newRule);
+    return newRule;
+  },
+
+  async updateAlertRule(id: string, rule: any): Promise<any> {
+    seed();
+    const idx = state.alertRules.findIndex((r) => r.id === id);
+    if (idx < 0) throw new Error("alert rule not found");
+    state.alertRules[idx] = { ...state.alertRules[idx], ...rule, updated_at: iso() };
+    return state.alertRules[idx];
+  },
+
+  async deleteAlertRule(id: string): Promise<void> {
+    seed();
+    state.alertRules = state.alertRules.filter((r) => r.id !== id);
+  },
+
+  async listAlertHistory(service?: string): Promise<any[]> {
+    seed();
+    return state.alertHistory.filter((h) => !service || h.service === service);
+  },
+
+  async resolveAlert(id: string): Promise<void> {
+    seed();
+    const idx = state.alertHistory.findIndex((h) => h.id === id);
+    if (idx >= 0) {
+      state.alertHistory[idx].status = "resolved";
+    }
   },
 };

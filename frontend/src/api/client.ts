@@ -294,6 +294,58 @@ const realApiClient = {
       logs: data.logs || [],
     };
   },
+
+  // ============ 告警 API ============
+
+  async listAlertRules(service?: string): Promise<any[]> {
+    let url = `${API_BASE}/alerts/rules`;
+    if (service) {
+      url += `?service=${encodeURIComponent(service)}`;
+    }
+    const res = await fetch(url, { headers: getHeaders() });
+    return await res.json();
+  },
+
+  async createAlertRule(rule: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/alerts/rules`, {
+      method: "POST",
+      headers: { ...getHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(rule),
+    });
+    return await res.json();
+  },
+
+  async updateAlertRule(id: string, rule: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/alerts/rules/${id}`, {
+      method: "PUT",
+      headers: { ...getHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(rule),
+    });
+    return await res.json();
+  },
+
+  async deleteAlertRule(id: string): Promise<void> {
+    await fetch(`${API_BASE}/alerts/rules/${id}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+  },
+
+  async listAlertHistory(service?: string): Promise<any[]> {
+    let url = `${API_BASE}/alerts/history`;
+    if (service) {
+      url += `?service=${encodeURIComponent(service)}`;
+    }
+    const res = await fetch(url, { headers: getHeaders() });
+    return await res.json();
+  },
+
+  async resolveAlert(id: string): Promise<void> {
+    await fetch(`${API_BASE}/alerts/history/${id}/resolve`, {
+      method: "PUT",
+      headers: getHeaders(),
+    });
+  },
 };
 
 export const apiClient = (isMockEnabled()
