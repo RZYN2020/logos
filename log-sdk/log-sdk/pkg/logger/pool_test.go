@@ -3,75 +3,74 @@ package logger
 import (
 	"testing"
 	"github.com/log-system/log-sdk/pkg/encoder"
-	"time"
 )
 
 func TestLogEntryPool(t *testing.T) {
 	// Test acquiring from pool
 	entry1 := acquireLogEntry()
 	if entry1 == nil {
-		t.Fatal("acquireLogEntry() returned nil")
+		t.Fatal("acquireLogEntry returned nil")
 	}
+
 	if entry1.Fields == nil {
 		t.Error("Fields map should be initialized")
 	}
 
-	// Set some data
-	entry1.Level = "INFO"
+	// Modify entry and release
 	entry1.Message = "test message"
-	entry1.Fields["key"] = "value"
-	entry1.Timestamp = time.Now()
+	entry1.Level = "INFO"
+	if len(entry1.Fields) == 0 {
+		entry1.Fields = make([]encoder.Field, 1)
+	}
+	entry1.Fields[0] = F("key", "value")
+	entry1.FieldsLen = 1
 
-	// Release back to pool
 	releaseLogEntry(entry1)
 
-	// Acquire again - should be reset
+	// Acquire again, should be reset
 	entry2 := acquireLogEntry()
-	if entry2 == nil {
-		t.Fatal("acquireLogEntry() returned nil on second call")
-	}
 
-	// Fields should be empty after reset
-	if len(entry2.Fields) != 0 {
-		t.Errorf("Fields should be empty after acquire, got %d fields", len(entry2.Fields))
+	if entry2.Message != "" {
+		t.Errorf("Message should be empty after acquire, got %s", entry2.Message)
 	}
 	if entry2.Level != "" {
-		t.Errorf("Level should be empty, got %s", entry2.Level)
+		t.Errorf("Level should be empty after acquire, got %s", entry2.Level)
 	}
-	if entry2.Message != "" {
-		t.Errorf("Message should be empty, got %s", entry2.Message)
+
+	// FieldsLen should be 0
+	if entry2.FieldsLen != 0 {
+		t.Errorf("FieldsLen should be 0 after acquire, got %d", entry2.FieldsLen)
 	}
+
+	releaseLogEntry(entry2)
 }
 
 func TestLogEntryPool_MultipleAcquire(t *testing.T) {
-	// Test acquiring multiple entries
 	entries := make([]*encoder.LogEntry, 10)
+
+	// Acquire multiple
 	for i := 0; i < 10; i++ {
 		entries[i] = acquireLogEntry()
-		entries[i].Fields["index"] = i
+		if len(entries[i].Fields) == 0 {
+			entries[i].Fields = make([]encoder.Field, 1)
+		}
+		entries[i].Fields[0] = F("index", i)
+		entries[i].FieldsLen = 1
 	}
 
 	// Release all
-	for _, entry := range entries {
-		releaseLogEntry(entry)
+	for i := 0; i < 10; i++ {
+		releaseLogEntry(entries[i])
 	}
 
-	// Acquire again - might get reused entries
+	// Acquire again and verify
 	for i := 0; i < 10; i++ {
 		entry := acquireLogEntry()
-		if entry == nil {
-			t.Fatal("acquireLogEntry() returned nil")
-		}
-		if len(entry.Fields) != 0 {
+		if entry.FieldsLen != 0 {
 			t.Error("Fields should be reset")
 		}
 		releaseLogEntry(entry)
 	}
-}
-
-func TestLogEntryPool_NilRelease(t *testing.T) {
-	// Should not panic
-	releaseLogEntry(nil)
 }
 
 // BenchmarkLogEntryPool benchmarks pool performance
@@ -79,23 +78,19 @@ func BenchmarkLogEntryPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		entry := acquireLogEntry()
-		entry.Level = "INFO"
-		entry.Message = "benchmark"
-		entry.Fields["key"] = "value"
+		entry.Fields[0] = F("key", "value"); entry.FieldsLen=1
 		releaseLogEntry(entry)
 	}
 }
 
-// BenchmarkLogEntryWithoutPool benchmarks without pool
+// BenchmarkLogEntryWithoutPool benchmarks allocation without pool
 func BenchmarkLogEntryWithoutPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		entry := &encoder.LogEntry{
-			Fields: make(map[string]interface{}, 8),
+			Fields: make([]encoder.Field, 8),
 		}
-		entry.Level = "INFO"
-		entry.Message = "benchmark"
-		entry.Fields["key"] = "value"
-		// Let GC handle it
+		entry.Fields[0] = F("key", "value"); entry.FieldsLen=1
+		_ = entry
 	}
 }

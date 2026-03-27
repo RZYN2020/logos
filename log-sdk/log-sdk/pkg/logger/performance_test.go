@@ -127,7 +127,7 @@ func BenchmarkLogEntryPool_Parallel(b *testing.B) {
 			entry := acquireLogEntry()
 			entry.Level = "INFO"
 			entry.Message = "benchmark"
-			entry.Fields["key"] = "value"
+			entry.Fields[0] = F("key", "value"); entry.FieldsLen=1
 			releaseLogEntry(entry)
 		}
 	})
@@ -364,7 +364,7 @@ func BenchmarkHookOverhead(b *testing.B) {
 
 		log = log.AddHook(LevelHook(LevelDebug))
 		log = log.AddHook(LineHook(1, 100000))
-		log = log.AddHook(Func(func(entry encoder.LogEntry) bool { return true }))
+		log = log.AddHook(Func(func(entry *encoder.LogEntry) bool { return true }))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

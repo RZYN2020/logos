@@ -3,102 +3,135 @@ package encoder
 import (
 	"bytes"
 	"io"
+	"strconv"
 	"sync"
-
+	"time"
 	"github.com/bytedance/sonic"
 )
 
-// JSONEncoder implements Encoder for JSON format using sonic
 type JSONEncoder struct {
 	config Config
 	pool   sync.Pool
 }
 
-// NewJSONEncoder creates a new JSON encoder
 func NewJSONEncoder(cfg Config) *JSONEncoder {
 	return &JSONEncoder{
 		config: cfg,
 		pool: sync.Pool{
 			New: func() interface{} {
-				return &bytes.Buffer{}
+				// Pre-allocate buffer to avoid reallocation
+				buf := bytes.NewBuffer(make([]byte, 0, 1024))
+				return buf
 			},
 		},
 	}
 }
 
-// DefaultJSONEncoder returns a JSON encoder with default configuration
 func DefaultJSONEncoder() *JSONEncoder {
 	return NewJSONEncoder(DefaultConfig())
 }
 
-// ContentType returns the content type for JSON encoding
 func (e *JSONEncoder) ContentType() string {
 	return "application/json"
 }
 
-// Encode serializes a LogEntry to JSON
+// Encode serializes a LogEntry to JSON without map allocation
 func (e *JSONEncoder) Encode(entry LogEntry, w io.Writer) error {
-	m := e.buildMap(entry)
-
-	// Get buffer from pool
 	buf := e.pool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer e.pool.Put(buf)
 
-	// Encode to buffer
-	var data []byte
-	var err error
-	if e.config.PrettyPrint {
-		data, err = sonic.ConfigDefault.MarshalIndent(m, "", "  ")
-	} else {
-		data, err = sonic.ConfigDefault.Marshal(m)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Write to output
-	_, err = w.Write(data)
+	e.encodeToBuffer(entry, buf)
+	_, err := w.Write(buf.Bytes())
 	return err
 }
 
-// EncodeToBytes serializes a LogEntry to JSON bytes
 func (e *JSONEncoder) EncodeToBytes(entry LogEntry) ([]byte, error) {
-	m := e.buildMap(entry)
+	buf := e.pool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer e.pool.Put(buf)
 
-	if e.config.PrettyPrint {
-		return sonic.ConfigDefault.MarshalIndent(m, "", "  ")
-	}
-	return sonic.ConfigDefault.Marshal(m)
+	e.encodeToBuffer(entry, buf)
+	
+	// Must copy bytes because buffer will be returned to pool
+	res := make([]byte, buf.Len())
+	copy(res, buf.Bytes())
+	return res, nil
 }
 
-func (e *JSONEncoder) buildMap(entry LogEntry) map[string]interface{} {
-	m := make(map[string]interface{}, 10+len(entry.Fields))
+func (e *JSONEncoder) encodeToBuffer(entry LogEntry, buf *bytes.Buffer) {
+	buf.WriteByte('{')
+	
+	// Timestamp
+	buf.WriteString(`"timestamp":"`)
+	if e.config.TimeFormat == time.RFC3339Nano {
+		buf.WriteString(entry.Timestamp.Format(time.RFC3339Nano))
+	} else {
+		buf.WriteString(entry.Timestamp.Format(e.config.TimeFormat))
+	}
+	buf.WriteString(`",`)
 
-	m["timestamp"] = entry.Timestamp.Format(e.config.TimeFormat)
-	m["level"] = entry.Level
-	m["message"] = entry.Message
-	m["service"] = entry.Service
+	// Required fields
+	buf.WriteString(`"level":"`)
+	buf.WriteString(entry.Level)
+	buf.WriteString(`","message":`)
+	
+	// Escape message string using sonic
+	msgBytes, _ := sonic.Marshal(entry.Message)
+	buf.Write(msgBytes)
+	
+	buf.WriteString(`,"service":"`)
+	buf.WriteString(entry.Service)
+	buf.WriteByte('"')
 
+	// Optional fields
 	if entry.Cluster != "" {
-		m["cluster"] = entry.Cluster
+		buf.WriteString(`,"cluster":"`)
+		buf.WriteString(entry.Cluster)
+		buf.WriteByte('"')
 	}
 	if entry.Pod != "" {
-		m["pod"] = entry.Pod
+		buf.WriteString(`,"pod":"`)
+		buf.WriteString(entry.Pod)
+		buf.WriteByte('"')
 	}
 	if entry.TraceID != "" {
-		m["trace_id"] = entry.TraceID
+		buf.WriteString(`,"trace_id":"`)
+		buf.WriteString(entry.TraceID)
+		buf.WriteByte('"')
 	}
 	if entry.SpanID != "" {
-		m["span_id"] = entry.SpanID
+		buf.WriteString(`,"span_id":"`)
+		buf.WriteString(entry.SpanID)
+		buf.WriteByte('"')
 	}
 
-	// Merge custom fields
-	for k, v := range entry.Fields {
-		// Custom fields don't override standard fields
-		if _, exists := m[k]; !exists {
-			m[k] = v
+	// Custom fields
+	for i := 0; i < entry.FieldsLen; i++ {
+		f := &entry.Fields[i]
+		buf.WriteString(`,"`)
+		buf.WriteString(f.Key)
+		buf.WriteString(`":`)
+		
+		switch f.Type {
+		case IntType:
+			buf.WriteString(strconv.FormatInt(f.Int, 10))
+		case FloatType:
+			buf.WriteString(strconv.FormatFloat(f.Float, 'f', -1, 64))
+		case StringType:
+			valBytes, _ := sonic.Marshal(f.Str)
+			buf.Write(valBytes)
+		case BoolType:
+			if f.Int == 1 {
+				buf.WriteString("true")
+			} else {
+				buf.WriteString("false")
+			}
+		case InterfaceType:
+			valBytes, _ := sonic.Marshal(f.Obj)
+			buf.Write(valBytes)
 		}
 	}
-	return m
+
+	buf.WriteByte('}')
 }

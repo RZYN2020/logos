@@ -1,4 +1,3 @@
-// Package encoder provides log entry encoding interfaces and implementations
 package encoder
 
 import (
@@ -8,11 +7,29 @@ import (
 
 // Encoder is the interface for log entry encoding
 type Encoder interface {
-	// Encode serializes a log entry to the writer
 	Encode(entry LogEntry, w io.Writer) error
-	// ContentType returns the content type of the encoded data
 	ContentType() string
 }
+
+// Field represents a structured log field
+type Field struct {
+	Key   string
+	Type  FieldType
+	Int   int64
+	Float float64
+	Str   string
+	Obj   interface{}
+}
+
+type FieldType uint8
+
+const (
+	IntType FieldType = iota
+	FloatType
+	StringType
+	BoolType
+	InterfaceType
+)
 
 // LogEntry represents a structured log entry for encoding
 type LogEntry struct {
@@ -24,7 +41,10 @@ type LogEntry struct {
 	Pod       string
 	TraceID   string
 	SpanID    string
-	Fields    map[string]interface{}
+	// Use slice instead of map to avoid allocation
+	Fields    []Field
+	FieldsLen int
+	
 	File      string `json:"-"`
 	Line      int    `json:"-"`
 	Function  string `json:"-"`
@@ -32,10 +52,8 @@ type LogEntry struct {
 
 // Config holds encoder configuration
 type Config struct {
-	// PrettyPrint enables pretty-printed JSON output
 	PrettyPrint bool
-	// TimeFormat specifies the time format for timestamps
-	TimeFormat string
+	TimeFormat  string
 }
 
 // DefaultConfig returns the default encoder configuration
