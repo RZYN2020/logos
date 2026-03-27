@@ -8,11 +8,10 @@ import (
 // RingBuffer is a lock-free circular buffer for LogMessage
 // It supports multiple producers and single consumer (MPSC)
 type RingBuffer struct {
-	buffer   []LogMessage
-	size     uint64
-	mask     uint64
-	head     atomic.Uint64 // read position
-	tail     atomic.Uint64 // write position
+	data []atomic.Pointer[LogMessage]
+	cap  uint64
+	head atomic.Uint64
+	tail atomic.Uint64
 }
 
 // ErrBufferFull is returned when the buffer is full
@@ -28,9 +27,8 @@ func NewRingBuffer(capacity int) *RingBuffer {
 	capacity = nextPowerOf2(capacity)
 
 	return &RingBuffer{
-		buffer: make([]LogMessage, capacity),
-		size:   uint64(capacity),
-		mask:   uint64(capacity - 1),
+		data: make([]atomic.Pointer[LogMessage], capacity),
+		cap:  uint64(capacity),
 	}
 }
 
@@ -48,137 +46,134 @@ func nextPowerOf2(n int) int {
 
 // Push adds a message to the ring buffer
 // Returns ErrBufferFull if the buffer is full
-func (rb *RingBuffer) Push(msg LogMessage) error {
-	tail := rb.tail.Load()
-	head := rb.head.Load()
-
-	// Check if buffer is full
-	if tail-head >= rb.size {
-		return ErrBufferFull
+func (r *RingBuffer) Push(item LogMessage) error {
+	for {
+		t := r.tail.Load()
+		h := r.head.Load()
+		if t-h >= r.cap {
+			return ErrBufferFull
+		}
+		if r.tail.CompareAndSwap(t, t+1) {
+			r.data[t%r.cap].Store(&item)
+			return nil
+		}
 	}
-
-	// Write to buffer
-	idx := tail & rb.mask
-	rb.buffer[idx] = msg
-
-	// Update tail
-	rb.tail.Store(tail + 1)
-
-	return nil
 }
 
-// PushBatch adds multiple messages to the ring buffer
-// Returns the number of messages successfully added
-func (rb *RingBuffer) PushBatch(msgs []LogMessage) int {
+// TryPush is alias for Push
+func (r *RingBuffer) TryPush(item LogMessage) bool {
+	return r.Push(item) == nil
+}
+
+// DrainAll pops all messages currently in the buffer
+func (r *RingBuffer) DrainAll() []LogMessage {
+	for {
+		t := r.tail.Load()
+		h := r.head.Load()
+		if h == t {
+			return nil
+		}
+
+		if r.head.CompareAndSwap(h, t) {
+			out := make([]LogMessage, 0, t-h)
+			for i := h; i < t; i++ {
+				// 自旋等待并发的 TryPush 完成写入操作
+				for {
+					val := r.data[i%r.cap].Swap(nil)
+					if val != nil {
+						out = append(out, *val)
+						break
+					}
+				}
+			}
+			return out
+		}
+	}
+}
+
+// PushBatch is not efficiently implementable in lock-free fashion without complex logic,
+// but for backward compatibility in tests:
+func (r *RingBuffer) PushBatch(msgs []LogMessage) int {
+	count := 0
+	for _, msg := range msgs {
+		if err := r.Push(msg); err != nil {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+// Pop is for test compatibility
+func (r *RingBuffer) Pop() (LogMessage, error) {
+	for {
+		t := r.tail.Load()
+		h := r.head.Load()
+		if h == t {
+			return LogMessage{}, ErrBufferEmpty
+		}
+		if r.head.CompareAndSwap(h, h+1) {
+			for {
+				val := r.data[h%r.cap].Swap(nil)
+				if val != nil {
+					return *val, nil
+				}
+			}
+		}
+	}
+}
+
+// PopBatch is for test compatibility
+func (r *RingBuffer) PopBatch(msgs []LogMessage) int {
 	if len(msgs) == 0 {
 		return 0
 	}
+	for {
+		t := r.tail.Load()
+		h := r.head.Load()
+		if h == t {
+			return 0
+		}
+		
+		available := t - h
+		toRead := uint64(len(msgs))
+		if toRead > available {
+			toRead = available
+		}
 
-	tail := rb.tail.Load()
-	head := rb.head.Load()
-
-	// Calculate available space
-	available := rb.size - (tail - head)
-	if available == 0 {
-		return 0
+		if r.head.CompareAndSwap(h, h+toRead) {
+			for i := uint64(0); i < toRead; i++ {
+				for {
+					val := r.data[(h+i)%r.cap].Swap(nil)
+					if val != nil {
+						msgs[i] = *val
+						break
+					}
+				}
+			}
+			return int(toRead)
+		}
 	}
-
-	// Limit to available space
-	toWrite := len(msgs)
-	if uint64(toWrite) > available {
-		toWrite = int(available)
-	}
-
-	// Write messages
-	for i := 0; i < toWrite; i++ {
-		idx := (tail + uint64(i)) & rb.mask
-		rb.buffer[idx] = msgs[i]
-	}
-
-	// Update tail
-	rb.tail.Store(tail + uint64(toWrite))
-
-	return toWrite
-}
-
-// Pop removes and returns a message from the ring buffer
-// Returns ErrBufferEmpty if the buffer is empty
-func (rb *RingBuffer) Pop() (LogMessage, error) {
-	head := rb.head.Load()
-	tail := rb.tail.Load()
-
-	// Check if buffer is empty
-	if head == tail {
-		return LogMessage{}, ErrBufferEmpty
-	}
-
-	// Read from buffer
-	idx := head & rb.mask
-	msg := rb.buffer[idx]
-
-	// Clear the slot to help GC
-	rb.buffer[idx] = LogMessage{}
-
-	// Update head
-	rb.head.Store(head + 1)
-
-	return msg, nil
-}
-
-// PopBatch removes and returns up to n messages from the ring buffer
-// Returns the number of messages popped
-func (rb *RingBuffer) PopBatch(msgs []LogMessage) int {
-	if len(msgs) == 0 {
-		return 0
-	}
-
-	head := rb.head.Load()
-	tail := rb.tail.Load()
-
-	// Calculate available messages
-	available := tail - head
-	if available == 0 {
-		return 0
-	}
-
-	// Limit to requested size
-	toRead := len(msgs)
-	if uint64(toRead) > available {
-		toRead = int(available)
-	}
-
-	// Read messages
-	for i := 0; i < toRead; i++ {
-		idx := (head + uint64(i)) & rb.mask
-		msgs[i] = rb.buffer[idx]
-		// Clear the slot
-		rb.buffer[idx] = LogMessage{}
-	}
-
-	// Update head
-	rb.head.Store(head + uint64(toRead))
-
-	return toRead
 }
 
 // Len returns the number of messages in the buffer
-func (rb *RingBuffer) Len() int {
-	tail := rb.tail.Load()
-	head := rb.head.Load()
-	return int(tail - head)
+func (r *RingBuffer) Len() int {
+	t := r.tail.Load()
+	h := r.head.Load()
+	return int(t - h)
 }
 
 // Cap returns the capacity of the buffer
-func (rb *RingBuffer) Cap() int {
-	return int(rb.size)
+func (r *RingBuffer) Cap() int {
+	return int(r.cap)
 }
 
 // IsEmpty returns true if the buffer is empty
-func (rb *RingBuffer) IsEmpty() bool {
-	return rb.Len() == 0
+func (r *RingBuffer) IsEmpty() bool {
+	return r.Len() == 0
 }
 
 // IsFull returns true if the buffer is full
-func (rb *RingBuffer) IsFull() bool {
-	return rb.Len() >= int(rb.size)
+func (r *RingBuffer) IsFull() bool {
+	return r.Len() >= int(r.cap)
 }

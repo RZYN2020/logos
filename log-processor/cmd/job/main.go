@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,11 +15,12 @@ import (
 
 	"github.com/log-system/log-processor/pkg/analyzer"
 	"github.com/log-system/log-processor/pkg/filter"
-	processorRule "github.com/log-system/log-processor/pkg/rule"
 	"github.com/log-system/log-processor/pkg/parser"
+	processorRule "github.com/log-system/log-processor/pkg/rule"
 	"github.com/log-system/log-processor/pkg/semantic"
 	"github.com/log-system/log-processor/pkg/sink"
 	"github.com/log-system/log-processor/pkg/transformer"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -34,6 +36,7 @@ type Config struct {
 	EtcdEndpoints   []string
 	EnableFiltering bool
 	EnableTransform bool
+	MetricsPort     string
 }
 
 // Processor 日志处理器
@@ -336,7 +339,17 @@ func main() {
 		EtcdEndpoints:   getEnvStrings("ETCD_ENDPOINTS", []string{"localhost:2379"}),
 		EnableFiltering: getEnvBool("ENABLE_FILTERING", false),
 		EnableTransform: getEnvBool("ENABLE_TRANSFORM", false),
+		MetricsPort:     getEnvString("METRICS_PORT", "9090"),
 	}
+
+	// 启动 Metrics 服务器
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Printf("Starting metrics server on :%s", cfg.MetricsPort)
+		if err := http.ListenAndServe(":"+cfg.MetricsPort, nil); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
 
 	// 创建处理器
 	processor, err := NewProcessor(cfg)

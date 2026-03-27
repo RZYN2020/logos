@@ -19,6 +19,14 @@ scrape_configs:
     static_configs:
       - targets: ['kafka-0:9092']
 
+  - job_name: 'log-analyzer'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  - job_name: 'log-processor'
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+
   - job_name: 'jaeger'
     static_configs:
       - targets: ['jaeger:16686']

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"testing"
+	"github.com/log-system/log-sdk/pkg/encoder"
 	"time"
 )
 
@@ -191,7 +192,7 @@ func TestLevelHook(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := LevelHook(tt.minLevel)
-			entry := LogEntry{Level: tt.entryLevel}
+			entry := encoder.LogEntry{Level: tt.entryLevel}
 
 			got := hook.OnLog(entry)
 			if got != tt.wantPass {
@@ -221,7 +222,7 @@ func TestLineHook(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hook := LineHook(tt.minLine, tt.maxLine)
-			entry := LogEntry{Line: tt.entryLine}
+			entry := encoder.LogEntry{Line: tt.entryLine}
 
 			got := hook.OnLog(entry)
 			if got != tt.wantPass {
@@ -237,7 +238,7 @@ func TestRegexHook(t *testing.T) {
 	// 注意：当前 RegexHook 是简化实现，始终返回 true
 	// 这里测试接口兼容性
 	hook := RegexHook("cluster", "prod-.*")
-	entry := LogEntry{Cluster: "prod-cluster-1"}
+	entry := encoder.LogEntry{Cluster: "prod-cluster-1"}
 
 	// 简化实现始终返回 true
 	if !hook.OnLog(entry) {

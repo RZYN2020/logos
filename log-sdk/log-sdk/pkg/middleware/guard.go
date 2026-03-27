@@ -1,4 +1,4 @@
-package guard
+package middleware
 
 import (
 	"github.com/gin-gonic/gin"
@@ -58,6 +58,3 @@ func GinMiddleware(log logger.Logger) gin.HandlerFunc {
 		}
 	}
 }
-
-// HTTPMiddleware 标准http.Handler的拦截器（用于非Gin框架）
-// 简化实现，实际使用时需要适配具体框架

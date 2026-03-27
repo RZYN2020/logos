@@ -1,6 +1,6 @@
 module github.com/log-system/logos/examples/full-demo
 
-go 1.25
+go 1.20
 
 require (
 	github.com/log-system/log-sdk v0.0.0

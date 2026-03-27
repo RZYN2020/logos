@@ -12,7 +12,7 @@ import (
 // Producer 异步生产者
 type Producer struct {
 	writer        *kafka.Writer
-	buffer        chan LogMessage
+	buffer        *RingBuffer
 	batchSize     int
 	flushInterval time.Duration
 	wg            sync.WaitGroup
@@ -40,7 +40,7 @@ func NewProducer(brokers []string, batchSize int, flushInterval time.Duration) *
 			Async:        true,
 			RequiredAcks: kafka.RequireOne,
 		},
-		buffer:        make(chan LogMessage, batchSize*10),
+		buffer:        NewRingBuffer(batchSize * 10),
 		batchSize:     batchSize,
 		flushInterval: flushInterval,
 		ctx:           ctx,
@@ -57,13 +57,14 @@ func NewProducer(brokers []string, batchSize int, flushInterval time.Duration) *
 // Send 异步发送日志
 func (p *Producer) Send(msg LogMessage) error {
 	select {
-	case p.buffer <- msg:
-		return nil
 	case <-p.ctx.Done():
 		return fmt.Errorf("producer closed")
 	default:
-		// 缓冲区满，直接丢弃（背压）
-		return fmt.Errorf("buffer full, message dropped")
+		if !p.buffer.TryPush(msg) {
+			// 缓冲区满，直接丢弃（背压）
+			return fmt.Errorf("buffer full, message dropped")
+		}
+		return nil
 	}
 }
 
@@ -74,43 +75,50 @@ func (p *Producer) flushLoop() {
 	ticker := time.NewTicker(p.flushInterval)
 	defer ticker.Stop()
 
-	batch := make([]kafka.Message, 0, p.batchSize)
-
 	for {
 		select {
 		case <-p.ctx.Done():
 			// 刷新剩余消息
-			p.flush(batch)
+			msgs := p.buffer.DrainAll()
+			p.flushLogMessages(msgs)
 			return
 
-		case msg := <-p.buffer:
-			kafkaMsg := kafka.Message{
-				Topic: msg.Topic,
-				Key:   []byte(msg.Key),
-				Value: msg.Value,
-			}
-
-			// 添加headers
-			for k, v := range msg.Headers {
-				kafkaMsg.Headers = append(kafkaMsg.Headers, kafka.Header{
-					Key:   k,
-					Value: []byte(v),
-				})
-			}
-
-			batch = append(batch, kafkaMsg)
-
-			if len(batch) >= p.batchSize {
-				p.flush(batch)
-				batch = batch[:0]
-			}
-
 		case <-ticker.C:
-			if len(batch) > 0 {
-				p.flush(batch)
-				batch = batch[:0]
-			}
+			msgs := p.buffer.DrainAll()
+			p.flushLogMessages(msgs)
 		}
+	}
+}
+
+func (p *Producer) flushLogMessages(msgs []LogMessage) {
+	if len(msgs) == 0 {
+		return
+	}
+
+	batch := make([]kafka.Message, 0, len(msgs))
+	for _, msg := range msgs {
+		kafkaMsg := kafka.Message{
+			Topic: msg.Topic,
+			Key:   []byte(msg.Key),
+			Value: msg.Value,
+		}
+
+		for k, v := range msg.Headers {
+			kafkaMsg.Headers = append(kafkaMsg.Headers, kafka.Header{
+				Key:   k,
+				Value: []byte(v),
+			})
+		}
+		batch = append(batch, kafkaMsg)
+	}
+	
+	// 按 batchSize 切分发送，防止单次发送过大
+	for i := 0; i < len(batch); i += p.batchSize {
+		end := i + p.batchSize
+		if end > len(batch) {
+			end = len(batch)
+		}
+		p.flush(batch[i:end])
 	}
 }
 
@@ -125,7 +133,7 @@ func (p *Producer) flush(batch []kafka.Message) {
 
 	if err := p.writer.WriteMessages(ctx, batch...); err != nil {
 		// 记录错误，但不中断处理
-		fmt.Printf("Failed to write messages: %v\n", err)
+		 // fmt.Printf("Failed to write messages: %v\n", err)
 	}
 }
 

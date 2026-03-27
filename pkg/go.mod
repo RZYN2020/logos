@@ -1,6 +1,6 @@
 module github.com/log-system/logos/pkg
 
-go 1.25
+go 1.20
 
 require go.etcd.io/etcd/client/v3 v3.5.9
 

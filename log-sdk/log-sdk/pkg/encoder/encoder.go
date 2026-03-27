@@ -25,6 +25,9 @@ type LogEntry struct {
 	TraceID   string
 	SpanID    string
 	Fields    map[string]interface{}
+	File      string `json:"-"`
+	Line      int    `json:"-"`
+	Function  string `json:"-"`
 }
 
 // Config holds encoder configuration

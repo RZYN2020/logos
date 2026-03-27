@@ -4,9 +4,46 @@ package metrics
 import (
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// Metrics 性能指标
+var (
+	// ParseTotal 解析日志总数
+	ParseTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "log_processor_parse_total",
+		Help: "The total number of parsed logs",
+	}, []string{"status"}) // status: success, failure
+
+	// ParseLatency 解析延迟
+	ParseLatency = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "log_processor_parse_latency_seconds",
+		Help:    "Latency of log parsing in seconds",
+		Buckets: prometheus.DefBuckets,
+	})
+
+	// FilterTotal 过滤日志总数
+	FilterTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "log_processor_filter_total",
+		Help: "The total number of filtered logs",
+	}, []string{"action"}) // action: kept, dropped
+
+	// WriteTotal 写入存储总数
+	WriteTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "log_processor_write_total",
+		Help: "The total number of logs written to sink",
+	}, []string{"status"}) // status: success, failure
+
+	// WriteLatency 写入延迟
+	WriteLatency = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "log_processor_write_latency_seconds",
+		Help:    "Latency of writing logs to sink in seconds",
+		Buckets: prometheus.DefBuckets,
+	})
+)
+
+// Metrics 性能指标 (Legacy for backward compatibility)
 type Metrics struct {
 	mu sync.RWMutex
 
@@ -17,16 +54,16 @@ type Metrics struct {
 	ParseLatencySum time.Duration
 
 	// 过滤指标
-	FilterCount     int64
-	FilterKept      int64
-	FilterDropped   int64
+	FilterCount   int64
+	FilterKept    int64
+	FilterDropped int64
 
 	// 转换指标
-	TransformCount  int64
+	TransformCount   int64
 	TransformSuccess int64
 
 	// 分析指标
-	AnalyzeCount    int64
+	AnalyzeCount int64
 
 	// 写入指标
 	WriteCount      int64
@@ -41,28 +78,28 @@ type Metrics struct {
 
 // LatencyStats 延迟统计
 type LatencyStats struct {
-	Count     int64
-	Avg       time.Duration
-	Min       time.Duration
-	Max       time.Duration
-	P50       time.Duration
-	P95       time.Duration
-	P99       time.Duration
+	Count int64
+	Avg   time.Duration
+	Min   time.Duration
+	Max   time.Duration
+	P50   time.Duration
+	P95   time.Duration
+	P99   time.Duration
 }
 
 // ParserMetrics 解析器指标
 type ParserMetrics struct {
-	Format      string
-	Count       int64
-	Success     int64
-	AvgLatency  time.Duration
+	Format     string
+	Count      int64
+	Success    int64
+	AvgLatency time.Duration
 }
 
 // FilterMetrics 过滤器指标
 type FilterMetrics struct {
-	RuleName    string
-	MatchCount  int64
-	Action      string
+	RuleName   string
+	MatchCount int64
+	Action     string
 }
 
 // NewMetrics 创建性能指标
@@ -81,10 +118,13 @@ func (m *Metrics) RecordParse(success bool, latency time.Duration) {
 	m.ParseCount++
 	if success {
 		m.ParseSuccess++
+		ParseTotal.WithLabelValues("success").Inc()
 	} else {
 		m.ParseFailure++
+		ParseTotal.WithLabelValues("failure").Inc()
 	}
 	m.ParseLatencySum += latency
+	ParseLatency.Observe(latency.Seconds())
 }
 
 // RecordFilter 记录过滤指标
@@ -95,8 +135,10 @@ func (m *Metrics) RecordFilter(kept bool) {
 	m.FilterCount++
 	if kept {
 		m.FilterKept++
+		FilterTotal.WithLabelValues("kept").Inc()
 	} else {
 		m.FilterDropped++
+		FilterTotal.WithLabelValues("dropped").Inc()
 	}
 }
 
@@ -127,10 +169,13 @@ func (m *Metrics) RecordWrite(success bool, latency time.Duration) {
 	m.WriteCount++
 	if success {
 		m.WriteSuccess++
+		WriteTotal.WithLabelValues("success").Inc()
 	} else {
 		m.WriteFailure++
+		WriteTotal.WithLabelValues("failure").Inc()
 	}
 	m.WriteLatencySum += latency
+	WriteLatency.Observe(latency.Seconds())
 }
 
 // GetParseLatency 获取解析延迟统计

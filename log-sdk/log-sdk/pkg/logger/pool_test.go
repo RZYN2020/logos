@@ -2,6 +2,7 @@ package logger
 
 import (
 	"testing"
+	"github.com/log-system/log-sdk/pkg/encoder"
 	"time"
 )
 
@@ -44,7 +45,7 @@ func TestLogEntryPool(t *testing.T) {
 
 func TestLogEntryPool_MultipleAcquire(t *testing.T) {
 	// Test acquiring multiple entries
-	entries := make([]*LogEntry, 10)
+	entries := make([]*encoder.LogEntry, 10)
 	for i := 0; i < 10; i++ {
 		entries[i] = acquireLogEntry()
 		entries[i].Fields["index"] = i
@@ -89,7 +90,7 @@ func BenchmarkLogEntryPool(b *testing.B) {
 func BenchmarkLogEntryWithoutPool(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		entry := &LogEntry{
+		entry := &encoder.LogEntry{
 			Fields: make(map[string]interface{}, 8),
 		}
 		entry.Level = "INFO"

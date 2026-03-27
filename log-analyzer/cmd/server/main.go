@@ -17,6 +17,7 @@ import (
 	"github.com/log-system/log-analyzer/internal/handlers"
 	"github.com/log-system/log-analyzer/internal/middleware"
 	"github.com/log-system/log-analyzer/internal/migrations"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -97,6 +98,9 @@ func NewServer(cfg Config) (*Server, error) {
 func (s *Server) setupRoutes() {
 	// CORS 中间件
 	s.engine.Use(middleware.CorsMiddleware())
+
+	// Prometheus 指标暴露
+	s.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// 健康检查
 	s.engine.GET("/health", s.healthHandler)

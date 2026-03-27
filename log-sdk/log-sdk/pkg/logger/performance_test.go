@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"github.com/log-system/log-sdk/pkg/encoder"
 	"time"
 )
 
@@ -11,7 +12,7 @@ import (
 func BenchmarkLogger_Printf(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -29,7 +30,7 @@ func BenchmarkLogger_Printf(b *testing.B) {
 func BenchmarkLogger_TraditionalStyle(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -51,7 +52,7 @@ func BenchmarkLogger_TraditionalStyle(b *testing.B) {
 func BenchmarkLogger_ChainStyle(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -73,7 +74,7 @@ func BenchmarkLogger_ChainStyle(b *testing.B) {
 func BenchmarkLogger_With(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -100,7 +101,7 @@ func BenchmarkLogger_With(b *testing.B) {
 func BenchmarkLogger_LevelFilter(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -136,7 +137,7 @@ func BenchmarkLogEntryPool_Parallel(b *testing.B) {
 func BenchmarkLogger_Memory(b *testing.B) {
 	log := New(Config{
 		ServiceName:       "benchmark",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -157,7 +158,7 @@ func BenchmarkLogger_Memory(b *testing.B) {
 func TestConcurrentLogging(t *testing.T) {
 	log := New(Config{
 		ServiceName:       "concurrent-test",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -197,7 +198,7 @@ func TestConcurrentLogging(t *testing.T) {
 func TestConcurrentLogging_WithHooks(t *testing.T) {
 	log := New(Config{
 		ServiceName:       "concurrent-hook-test",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -241,7 +242,7 @@ func TestConcurrentLogging_WithHooks(t *testing.T) {
 func TestConcurrentLogging_WithChaining(t *testing.T) {
 	log := New(Config{
 		ServiceName:       "concurrent-chain-test",
-		FallbackToConsole: true,
+		FallbackToConsole: false,
 	})
 	defer log.Close()
 
@@ -287,7 +288,7 @@ func BenchmarkComparison(b *testing.B) {
 	b.Run("Printf", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
@@ -300,7 +301,7 @@ func BenchmarkComparison(b *testing.B) {
 	b.Run("Traditional", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
@@ -313,7 +314,7 @@ func BenchmarkComparison(b *testing.B) {
 	b.Run("Chain", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
@@ -329,7 +330,7 @@ func BenchmarkHookOverhead(b *testing.B) {
 	b.Run("NoHooks", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
@@ -342,7 +343,7 @@ func BenchmarkHookOverhead(b *testing.B) {
 	b.Run("OneHook", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
@@ -357,13 +358,13 @@ func BenchmarkHookOverhead(b *testing.B) {
 	b.Run("ThreeHooks", func(b *testing.B) {
 		log := New(Config{
 			ServiceName:       "benchmark",
-			FallbackToConsole: true,
+			FallbackToConsole: false,
 		})
 		defer log.Close()
 
 		log = log.AddHook(LevelHook(LevelDebug))
 		log = log.AddHook(LineHook(1, 100000))
-		log = log.AddHook(Func(func(entry LogEntry) bool { return true }))
+		log = log.AddHook(Func(func(entry encoder.LogEntry) bool { return true }))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
