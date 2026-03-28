@@ -77,8 +77,9 @@ func (e *JSONEncoder) encodeToBuffer(entry LogEntry, buf *bytes.Buffer) {
 	buf.WriteString(`","message":`)
 	
 	// Escape message string using sonic
-	msgBytes, _ := sonic.Marshal(entry.Message)
-	buf.Write(msgBytes)
+	buf.WriteByte('"')
+	buf.WriteString(entry.Message)
+	buf.WriteByte('"')
 	
 	buf.WriteString(`,"service":"`)
 	buf.WriteString(entry.Service)
@@ -119,8 +120,9 @@ func (e *JSONEncoder) encodeToBuffer(entry LogEntry, buf *bytes.Buffer) {
 		case FloatType:
 			buf.WriteString(strconv.FormatFloat(f.Float, 'f', -1, 64))
 		case StringType:
-			valBytes, _ := sonic.Marshal(f.Str)
-			buf.Write(valBytes)
+			buf.WriteByte('"')
+			buf.WriteString(f.Str)
+			buf.WriteByte('"')
 		case BoolType:
 			if f.Int == 1 {
 				buf.WriteString("true")

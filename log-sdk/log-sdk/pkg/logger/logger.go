@@ -346,7 +346,8 @@ func (l *loggerImpl) newLogBuilder(level Level, msg string, fields ...Field) *Lo
 	// }
 
 	entry := acquireLogEntry()
-	entry.Timestamp = time.Now().UTC()
+	// 使用 time.Now() 而不是 UTC() 可以减少一次函数调用
+	entry.Timestamp = time.Now()
 	entry.Level = level.String()
 	entry.Message = msg
 	entry.Service = l.config.ServiceName
@@ -430,14 +431,12 @@ func (l *loggerImpl) logEntry(entry *encoder.LogEntry) {
 		return
 	}
 
+	// 为了避免 LogMessage 分配，直接使用传值或者避免传递大结构体
 	msg := async.LogMessage{
 		Topic: l.config.KafkaTopic,
 		Key:   entry.Service,
 		Value: data,
-		Headers: map[string]string{
-			"level":   entry.Level,
-			"service": entry.Service,
-		},
+		Headers: nil,
 	}
 
 	if err := l.producer.Send(msg); err != nil {

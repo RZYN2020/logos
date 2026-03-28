@@ -97,8 +97,8 @@ func BenchmarkLogosChain_FullFeatures(b *testing.B) {
 	}
 }
 
-// BenchmarkLogosChain_Pure2 测试不含限流、不含Hook、没有规则引擎的 Logos SDK 纯净版本
-func BenchmarkLogosChain_Pure2(b *testing.B) {
+// BenchmarkLogosChain_PureOld 测试不含限流、不含Hook、没有规则引擎的 Logos SDK 纯净版本
+func BenchmarkLogosChain_PureOld(b *testing.B) {
 	// RateLimit 设为 -1 代表在我们的测试或真实场景中完全跳过限流
 	// 为了演示极速纯净版，我们需要关闭或绕过限流判断（可以通过将 Allow 直接放行来实现，或者通过配置）
 	l := New(Config{
