@@ -383,7 +383,7 @@ func (l *loggerImpl) newLogBuilder(level Level, msg string, fields ...Field) *Lo
 }
 
 func (l *loggerImpl) logEntry(entry *encoder.LogEntry) {
-	if !l.guard.Allow() {
+	if l.guard != nil && !l.guard.Allow() {
 		return
 	}
 
@@ -396,7 +396,7 @@ func (l *loggerImpl) logEntry(entry *encoder.LogEntry) {
 	if l.rule != nil {
 		// 为了减少 map 创建，我们可以临时将 fields 转成 rule engine 需要的格式
 		// 但如果 rule 为空，就避免了 allocation
-		m := make(map[string]interface{}, entry.FieldsLen)
+		m := make(map[string]interface{}, 10)
 		for i := 0; i < entry.FieldsLen; i++ {
 			f := entry.Fields[i]
 			switch f.Type {
